@@ -877,16 +877,22 @@
   text-align: center;
   margin-bottom: 8px;
 }
-.auth-logo-icon {
-  font-size: 48px;
-  line-height: 1;
-  margin-bottom: 10px;
+.auth-logo-img {
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 0 14px rgba(124,108,247,.45))
+          drop-shadow(0 4px 12px rgba(0,0,0,.45));
 }
 .auth-logo-title {
   font-size: 28px;
   font-weight: 800;
-  color: var(--text-primary);
   letter-spacing: -.02em;
+  background: linear-gradient(135deg, #c4b8ff 0%, #7c6cf7 45%, #4dc9f6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin: 0 0 6px;
 }
 .auth-logo-sub {
