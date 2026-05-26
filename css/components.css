@@ -731,6 +731,7 @@
   align-items: center;
   gap: 8px;
 }
+<<<<<<< HEAD
 
 /* ══════════════════════════════════════════════
    NEW FEATURE 1 — Budget Period Toggle
@@ -847,3 +848,5 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+=======
+>>>>>>> 4d1d8a11fa60e2d5ede438ee92d413f807984b36

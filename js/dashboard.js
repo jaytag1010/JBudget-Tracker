@@ -7,15 +7,21 @@ export function updateDashboard(expenses) {
   updateGreeting();
   updateRecentTransactions(expenses);
   updateTopCategory(expenses);
+<<<<<<< HEAD
   updateInsights(expenses);          // ← NEW
 }
 
 // ── Greeting ──────────────────────────────────
+=======
+}
+
+>>>>>>> 4d1d8a11fa60e2d5ede438ee92d413f807984b36
 function updateGreeting() {
   const el = document.getElementById("greeting-text");
   if (el) el.textContent = greeting();
 }
 
+<<<<<<< HEAD
 // ── Recent Transactions ───────────────────────
 function updateRecentTransactions(expenses) {
   const el = document.getElementById("dash-recent-list");
@@ -24,6 +30,15 @@ function updateRecentTransactions(expenses) {
 }
 
 // ── Top Category ──────────────────────────────
+=======
+function updateRecentTransactions(expenses) {
+  const el   = document.getElementById("dash-recent-list");
+  if (!el) return;
+  const recent = expenses.slice(0, 5);
+  renderExpenseList(el, recent);
+}
+
+>>>>>>> 4d1d8a11fa60e2d5ede438ee92d413f807984b36
 function updateTopCategory(expenses) {
   const el = document.getElementById("dash-top-cat");
   if (!el) return;
@@ -32,6 +47,7 @@ function updateTopCategory(expenses) {
   if (!thisMonth.length) { el.textContent = "—"; return; }
 
   const grouped = groupByCategory(thisMonth);
+<<<<<<< HEAD
   const [topCat] = Object.entries(grouped).sort(([, a], [, b]) => b - a);
   if (topCat) el.textContent = `${topCat[0]} (${formatCurrency(topCat[1])})`;
 }
@@ -153,4 +169,10 @@ function updateTopPaymentMethod(thisMonth) {
   el.textContent = topMethod;
   el.title       = `Used ${txCount} time${txCount !== 1 ? "s" : ""} this month`;
   el.className   = "insight-value";
+=======
+  const [topCat] = Object.entries(grouped).sort(([,a],[,b]) => b - a);
+  if (topCat) {
+    el.textContent = `${topCat[0]} (${formatCurrency(topCat[1])})`;
+  }
+>>>>>>> 4d1d8a11fa60e2d5ede438ee92d413f807984b36
 }
