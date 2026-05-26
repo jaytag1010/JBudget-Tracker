@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0f0f13">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Personal expense tracker — fast, mobile-friendly, cloud-synced">
+  <title>SpendWise — Expense Tracker</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="loading-logo">
+      <div class="loading-icon">💰</div>
+      <h1>SpendWise</h1>
+      <p>Loading your finances…</p>
+      <div class="loading-spinner"></div>
+    </div>
+  </div>
+
+  <!-- ─── PAGES ─── -->
+  <main id="pages">
+
+    <!-- DASHBOARD -->
+    <section id="page-dashboard" class="page active">
+      <header class="page-header">
+        <div>
+          <p class="header-greeting" id="greeting-text">Good morning</p>
+          <h2 class="header-title">Overview</h2>
+        </div>
+        <button class="icon-btn" id="settings-btn" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </button>
+      </header>
+
+      <div class="page-content">
+        <!-- Balance Card -->
+        <div class="balance-card">
+          <span class="balance-label">Remaining Budget</span>
+          <div class="balance-amount" id="dash-remaining">₱0.00</div>
+          <div class="balance-meta">
+            <span>Monthly Budget: <strong id="dash-budget-total">₱0.00</strong></span>
+            <span id="dash-budget-pct" class="balance-pct">0%</span>
+          </div>
+          <div class="budget-bar-wrap">
+            <div class="budget-bar" id="dash-budget-bar"></div>
+          </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <span class="stat-icon">📊</span>
+            <div>
+              <span class="stat-label">Spent This Month</span>
+              <span class="stat-value red" id="dash-spent">₱0.00</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon">🔥</span>
+            <div>
+              <span class="stat-label">Top Category</span>
+              <span class="stat-value" id="dash-top-cat">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Savings Summary -->
+        <div class="section-header">
+          <h3>Savings Goals</h3>
+          <button class="link-btn" data-nav="savings">View All</button>
+        </div>
+        <div id="dash-savings-list" class="savings-mini-list">
+          <p class="empty-msg">No savings goals yet.</p>
+        </div>
+
+        <!-- Recent Transactions -->
+        <div class="section-header">
+          <h3>Recent Transactions</h3>
+          <button class="link-btn" data-nav="history">View All</button>
+        </div>
+        <div id="dash-recent-list" class="transaction-list">
+          <p class="empty-msg">No transactions yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section id="page-history" class="page">
+      <header class="page-header">
+        <h2 class="header-title">History</h2>
+        <span id="history-total" class="header-badge">₱0.00</span>
+      </header>
+
+      <div class="page-content">
+        <!-- Search -->
+        <div class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search-input" class="search-input" placeholder="Search transactions…">
+          <button class="clear-btn hidden" id="search-clear">✕</button>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-row">
+          <select id="filter-category" class="filter-select">
+            <option value="">All Categories</option>
+          </select>
+          <select id="filter-month" class="filter-select">
+            <option value="">All Months</option>
+          </select>
+        </div>
+
+        <div id="history-list" class="transaction-list">
+          <p class="empty-msg">No transactions found.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- BUDGETS -->
+    <section id="page-budgets" class="page">
+      <header class="page-header">
+        <h2 class="header-title">Budgets</h2>
+        <button class="icon-btn" id="budget-month-btn" aria-label="Select month">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </button>
+      </header>
+
+      <div class="page-content">
+        <div class="budget-month-label" id="budget-month-display">May 2026</div>
+
+        <!-- Overall budget -->
+        <div class="overall-budget-card">
+          <div class="ob-top">
+            <div>
+              <span class="ob-label">Monthly Budget</span>
+              <div class="ob-amount" id="budget-total-display">₱0.00</div>
+            </div>
+            <button class="icon-btn" id="edit-total-budget-btn" aria-label="Edit total budget">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </div>
+          <div class="ob-bar-wrap">
+            <div class="ob-bar" id="budget-overall-bar"></div>
+          </div>
+          <div class="ob-meta">
+            <span class="red" id="budget-total-spent">₱0.00 spent</span>
+            <span id="budget-total-remaining">₱0.00 left</span>
+          </div>
+        </div>
+
+        <!-- Per-category budgets -->
+        <div class="section-header">
+          <h3>By Category</h3>
+          <button class="link-btn" id="add-cat-budget-btn">+ Set Budget</button>
+        </div>
+        <div id="budget-list" class="budget-list">
+          <p class="empty-msg">No category budgets set.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SAVINGS -->
+    <section id="page-savings" class="page">
+      <header class="page-header">
+        <h2 class="header-title">Savings Goals</h2>
+        <button class="icon-btn" id="add-saving-btn" aria-label="Add goal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </header>
+
+      <div class="page-content">
+        <!-- Savings Summary -->
+        <div class="savings-summary-card">
+          <span class="ss-label">Total Saved</span>
+          <div class="ss-amount" id="savings-total">₱0.00</div>
+          <div class="ss-meta">
+            <span><strong id="savings-goal-count">0</strong> active goals</span>
+          </div>
+        </div>
+
+        <div id="savings-list" class="savings-list">
+          <p class="empty-msg">No savings goals yet. Add one!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="page-settings" class="page">
+      <header class="page-header">
+        <button class="icon-btn" id="settings-back-btn" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="header-title">Settings</h2>
+        <div style="width:40px"></div>
+      </header>
+
+      <div class="page-content">
+        <!-- Categories -->
+        <div class="settings-section">
+          <div class="section-header">
+            <h3>Categories</h3>
+            <button class="link-btn" id="add-category-btn">+ Add</button>
+          </div>
+          <div id="categories-list" class="settings-list">
+            <p class="empty-msg">Loading…</p>
+          </div>
+        </div>
+
+        <!-- Payment Methods -->
+        <div class="settings-section">
+          <div class="section-header">
+            <h3>Payment Methods</h3>
+            <button class="link-btn" id="add-payment-btn">+ Add</button>
+          </div>
+          <div id="payments-list" class="settings-list">
+            <p class="empty-msg">Loading…</p>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="settings-section danger-section">
+          <h3>Danger Zone</h3>
+          <button class="btn btn-danger full-width" id="reset-data-btn">Reset All Data</button>
+        </div>
+
+        <div class="app-version">SpendWise v1.0 · Powered by Firebase</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ─── BOTTOM NAV ─── -->
+  <nav id="bottom-nav">
+    <button class="nav-item active" data-page="dashboard" aria-label="Home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="nav-item" data-page="history" aria-label="History">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <span>History</span>
+    </button>
+    <button class="nav-item nav-add" id="nav-add-btn" aria-label="Add expense">
+      <div class="nav-add-ring">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </div>
+    </button>
+    <button class="nav-item" data-page="budgets" aria-label="Budgets">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Budgets</span>
+    </button>
+    <button class="nav-item" data-page="savings" aria-label="Savings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2z"/><path d="M12 6v6l4 2"/></svg>
+      <span>Savings</span>
+    </button>
+  </nav>
+
+  <!-- ─── MODALS ─── -->
+
+  <!-- Add/Edit Expense Modal -->
+  <div id="modal-expense" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-expense-title">
+    <div class="modal-backdrop" data-close="modal-expense"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="modal-expense-title">Add Expense</h3>
+        <button class="icon-btn" data-close="modal-expense" aria-label="Close">✕</button>
+      </div>
+
+      <form id="expense-form" class="modal-body" novalidate>
+        <input type="hidden" id="expense-id">
+
+        <!-- Amount -->
+        <div class="amount-group">
+          <span class="currency-symbol">₱</span>
+          <input type="number" id="expense-amount" class="amount-input" placeholder="0.00" step="0.01" min="0" required>
+        </div>
+
+        <!-- Category -->
+        <label class="form-label">Category</label>
+        <div id="category-grid" class="category-grid"></div>
+        <input type="hidden" id="expense-category" required>
+
+        <!-- Payment Method -->
+        <label class="form-label">Payment Method</label>
+        <div id="payment-chips" class="chips-row"></div>
+        <input type="hidden" id="expense-payment" required>
+
+        <!-- Note -->
+        <label class="form-label">Note <span class="optional">(optional)</span></label>
+        <input type="text" id="expense-note" class="form-input" placeholder="e.g. Jollibee lunch">
+
+        <!-- Date -->
+        <label class="form-label">Date</label>
+        <input type="date" id="expense-date" class="form-input" required>
+
+        <button type="submit" class="btn btn-primary full-width" id="expense-submit-btn">Save Expense</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add/Edit Category Modal -->
+  <div id="modal-category" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-category-title">
+    <div class="modal-backdrop" data-close="modal-category"></div>
+    <div class="modal-sheet modal-sheet-sm">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="modal-category-title">Add Category</h3>
+        <button class="icon-btn" data-close="modal-category" aria-label="Close">✕</button>
+      </div>
+      <form id="category-form" class="modal-body" novalidate>
+        <input type="hidden" id="category-id">
+        <label class="form-label">Icon (emoji)</label>
+        <input type="text" id="category-icon" class="form-input emoji-input" placeholder="🍔" maxlength="2">
+        <label class="form-label">Name</label>
+        <input type="text" id="category-name" class="form-input" placeholder="e.g. Food" required>
+        <label class="form-label">Color</label>
+        <div class="color-picker-row" id="color-picker"></div>
+        <input type="hidden" id="category-color" value="#7c6cf7">
+        <button type="submit" class="btn btn-primary full-width">Save Category</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add/Edit Payment Method Modal -->
+  <div id="modal-payment" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-payment-title">
+    <div class="modal-backdrop" data-close="modal-payment"></div>
+    <div class="modal-sheet modal-sheet-sm">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="modal-payment-title">Add Payment Method</h3>
+        <button class="icon-btn" data-close="modal-payment" aria-label="Close">✕</button>
+      </div>
+      <form id="payment-form" class="modal-body" novalidate>
+        <input type="hidden" id="payment-id">
+        <label class="form-label">Icon (emoji)</label>
+        <input type="text" id="payment-icon" class="form-input emoji-input" placeholder="💵" maxlength="2">
+        <label class="form-label">Name</label>
+        <input type="text" id="payment-name" class="form-input" placeholder="e.g. Cash" required>
+        <button type="submit" class="btn btn-primary full-width">Save Method</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add/Edit Savings Goal Modal -->
+  <div id="modal-saving" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-saving-title">
+    <div class="modal-backdrop" data-close="modal-saving"></div>
+    <div class="modal-sheet modal-sheet-sm">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="modal-saving-title">Add Savings Goal</h3>
+        <button class="icon-btn" data-close="modal-saving" aria-label="Close">✕</button>
+      </div>
+      <form id="saving-form" class="modal-body" novalidate>
+        <input type="hidden" id="saving-id">
+        <label class="form-label">Goal Name</label>
+        <input type="text" id="saving-name" class="form-input" placeholder="e.g. Emergency Fund" required>
+        <label class="form-label">Target Amount (₱)</label>
+        <input type="number" id="saving-target" class="form-input" placeholder="10000" min="1" required>
+        <label class="form-label">Amount Saved So Far (₱)</label>
+        <input type="number" id="saving-current" class="form-input" placeholder="0" min="0">
+        <label class="form-label">Deadline <span class="optional">(optional)</span></label>
+        <input type="date" id="saving-deadline" class="form-input">
+        <button type="submit" class="btn btn-primary full-width">Save Goal</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Set Category Budget Modal -->
+  <div id="modal-cat-budget" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-cat-budget-title">
+    <div class="modal-backdrop" data-close="modal-cat-budget"></div>
+    <div class="modal-sheet modal-sheet-sm">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="modal-cat-budget-title">Set Category Budget</h3>
+        <button class="icon-btn" data-close="modal-cat-budget" aria-label="Close">✕</button>
+      </div>
+      <form id="cat-budget-form" class="modal-body" novalidate>
+        <input type="hidden" id="cat-budget-id">
+        <label class="form-label">Category</label>
+        <select id="cat-budget-category" class="form-input" required></select>
+        <label class="form-label">Budget Amount (₱)</label>
+        <input type="number" id="cat-budget-amount" class="form-input" placeholder="5000" min="1" required>
+        <button type="submit" class="btn btn-primary full-width">Save Budget</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Total Budget Modal -->
+  <div id="modal-total-budget" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-total-budget-title">
+    <div class="modal-backdrop" data-close="modal-total-budget"></div>
+    <div class="modal-sheet modal-sheet-sm">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="modal-total-budget-title">Monthly Budget</h3>
+        <button class="icon-btn" data-close="modal-total-budget" aria-label="Close">✕</button>
+      </div>
+      <form id="total-budget-form" class="modal-body" novalidate>
+        <label class="form-label">Total Monthly Budget (₱)</label>
+        <input type="number" id="total-budget-amount" class="form-input" placeholder="20000" min="1" required>
+        <button type="submit" class="btn btn-primary full-width">Save Budget</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Confirm Dialog -->
+  <div id="modal-confirm" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+      <h3 id="confirm-title">Confirm</h3>
+      <p id="confirm-message">Are you sure?</p>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+        <button class="btn btn-danger" id="confirm-ok">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden" role="alert" aria-live="polite"></div>
+
+</div><!-- #app -->
+
+<!-- Firebase (CDN, ES Modules) -->
+<script type="module" src="js/app.js"></script>
+
+</body>
+</html>
