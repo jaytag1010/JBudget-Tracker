@@ -7,21 +7,15 @@ export function updateDashboard(expenses) {
   updateGreeting();
   updateRecentTransactions(expenses);
   updateTopCategory(expenses);
-<<<<<<< HEAD
-  updateInsights(expenses);          // ← NEW
+  updateInsights(expenses);
 }
 
 // ── Greeting ──────────────────────────────────
-=======
-}
-
->>>>>>> 4d1d8a11fa60e2d5ede438ee92d413f807984b36
 function updateGreeting() {
   const el = document.getElementById("greeting-text");
   if (el) el.textContent = greeting();
 }
 
-<<<<<<< HEAD
 // ── Recent Transactions ───────────────────────
 function updateRecentTransactions(expenses) {
   const el = document.getElementById("dash-recent-list");
@@ -30,15 +24,6 @@ function updateRecentTransactions(expenses) {
 }
 
 // ── Top Category ──────────────────────────────
-=======
-function updateRecentTransactions(expenses) {
-  const el   = document.getElementById("dash-recent-list");
-  if (!el) return;
-  const recent = expenses.slice(0, 5);
-  renderExpenseList(el, recent);
-}
-
->>>>>>> 4d1d8a11fa60e2d5ede438ee92d413f807984b36
 function updateTopCategory(expenses) {
   const el = document.getElementById("dash-top-cat");
   if (!el) return;
@@ -47,13 +32,12 @@ function updateTopCategory(expenses) {
   if (!thisMonth.length) { el.textContent = "—"; return; }
 
   const grouped = groupByCategory(thisMonth);
-<<<<<<< HEAD
   const [topCat] = Object.entries(grouped).sort(([, a], [, b]) => b - a);
   if (topCat) el.textContent = `${topCat[0]} (${formatCurrency(topCat[1])})`;
 }
 
 // ════════════════════════════════════════════
-//  INSIGHTS  (NEW)
+//  INSIGHTS
 // ════════════════════════════════════════════
 
 function updateInsights(expenses) {
@@ -79,7 +63,7 @@ function updatePeakDay(thisMonth) {
 
   if (!thisMonth.length) {
     el.textContent = "No data yet";
-    el.className = "insight-value";
+    el.className   = "insight-value";
     return;
   }
 
@@ -87,7 +71,7 @@ function updatePeakDay(thisMonth) {
   const byDay = {};
   thisMonth.forEach(e => {
     const d   = e.date?.toDate ? e.date.toDate() : new Date(e.date);
-    const key = d.toISOString().split("T")[0];           // "YYYY-MM-DD"
+    const key = d.toISOString().split("T")[0];   // "YYYY-MM-DD"
     byDay[key] = (byDay[key] || 0) + Number(e.amount);
   });
 
@@ -108,7 +92,7 @@ function updateDailyAvg(thisMonth) {
 
   if (!thisMonth.length) {
     el.textContent = "₱0.00";
-    el.className = "insight-value";
+    el.className   = "insight-value";
     return;
   }
 
@@ -169,10 +153,4 @@ function updateTopPaymentMethod(thisMonth) {
   el.textContent = topMethod;
   el.title       = `Used ${txCount} time${txCount !== 1 ? "s" : ""} this month`;
   el.className   = "insight-value";
-=======
-  const [topCat] = Object.entries(grouped).sort(([,a],[,b]) => b - a);
-  if (topCat) {
-    el.textContent = `${topCat[0]} (${formatCurrency(topCat[1])})`;
-  }
->>>>>>> 4d1d8a11fa60e2d5ede438ee92d413f807984b36
 }
