@@ -5,6 +5,7 @@ import {
   seedDefaultPaymentMethods, resetAllData,
 } from "../firebase/db.js";
 import { openModal, closeModal, showToast, confirmDialog, renderColorPicker, CATEGORY_COLORS } from "./ui.js";
+import { signOutUser } from "./auth.js";
 
 // ── In-memory caches (updated by real-time listeners) ──
 let _categories     = [];
@@ -199,6 +200,28 @@ function bindSettingsPageEvents() {
   document.getElementById("add-category-btn")?.addEventListener("click", openAddCategory);
   document.getElementById("add-payment-btn")?.addEventListener("click",  openAddPayment);
   document.getElementById("reset-data-btn")?.addEventListener("click",   handleResetData);
+  document.getElementById("sign-out-btn")?.addEventListener("click", async () => {
+    const ok = await confirmDialog("Sign Out", "Sign out of SpendWise?", "Sign Out");
+    if (ok) signOutUser();
+  });
   bindCategoryForm();
   bindPaymentForm();
+}
+
+// ── User profile card ─────────────────────────
+export function renderUserProfile(user) {
+  if (!user) return;
+  const avatar = document.getElementById("user-avatar");
+  const name   = document.getElementById("user-name");
+  const email  = document.getElementById("user-email");
+  if (avatar) {
+    if (user.photoURL) {
+      avatar.innerHTML = `<img src="${user.photoURL}" alt="avatar" class="avatar-img">`;
+    } else {
+      const initial = (user.displayName || user.email || "?")[0].toUpperCase();
+      avatar.textContent = initial;
+    }
+  }
+  if (name)  name.textContent  = user.displayName || "User";
+  if (email) email.textContent = user.email || "";
 }

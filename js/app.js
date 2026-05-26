@@ -2,40 +2,75 @@
 import { listenExpenses } from "../firebase/db.js";
 import { navigateTo, initConfirmDialog, initModalBackdrops, closeAllModals, showToast } from "./ui.js";
 import { initSettings, onCategoriesChanged } from "./settings.js";
-import { initExpenseForm, openAddExpense, renderCategoryGrid, renderPaymentChips } from "./expenses.js";
+import { initExpenseForm, openAddExpense, renderCategoryGrid } from "./expenses.js";
 import { initBudgets, updateBudgetExpenses } from "./budgets.js";
 import { initSavings } from "./savings.js";
 import { initHistory, updateHistory } from "./history.js";
 import { updateDashboard } from "./dashboard.js";
+import {
+  initAuth, signInWithGoogle, signInWithEmail, signUpWithEmail,
+  authErrorMessage,
+} from "./auth.js";
+import { renderUserProfile } from "./settings.js";
 
-// ── Boot ──────────────────────────────────────
-async function boot() {
+// ── Auth screen helpers ───────────────────────
+function showAuthScreen() {
+  document.getElementById("auth-screen")?.classList.remove("hidden");
+}
+function hideAuthScreen() {
+  document.getElementById("auth-screen")?.classList.add("hidden");
+}
+
+// ── Loading screen ────────────────────────────
+function dismissLoading() {
+  const screen = document.getElementById("loading-screen");
+  if (!screen) return;
+  screen.classList.add("fade-out");
+  setTimeout(() => screen.remove(), 500);
+}
+
+// ═══════════════════════════════════════════════
+//  BOOT  ─ auth-first entry point
+// ═══════════════════════════════════════════════
+function boot() {
+  // Bind auth form once (before auth state resolves)
+  bindAuthForm();
+
+  // Listen for auth state — Firebase resolves this quickly from cache
+  initAuth(
+    async (user) => {
+      // ── Signed in ──
+      hideAuthScreen();
+      await initApp(user);
+    },
+    () => {
+      // ── Signed out ──
+      dismissLoading();
+      showAuthScreen();
+    }
+  );
+}
+
+// ── Full app initialisation (runs after sign-in) ──
+async function initApp(user) {
   try {
-    // 1. Init settings (seeds defaults, starts listeners)
     await initSettings();
-
-    // 2. Init UI scaffolding
     initConfirmDialog();
     initModalBackdrops();
     initExpenseForm();
     bindNavigation();
-
-    // 3. Init page-specific modules
     initHistory();
     await initSavings();
     initBudgets([]);
 
-    // 4. Start real-time expense listener
     listenExpenses(expenses => {
       updateDashboard(expenses);
       updateHistory(expenses);
       updateBudgetExpenses(expenses);
     });
 
-    // 5. Re-render expense form grids when categories/methods change
     onCategoriesChanged(() => renderCategoryGrid(null));
-
-    // 6. Hide loading screen
+    renderUserProfile(user);
     dismissLoading();
 
   } catch (err) {
@@ -45,54 +80,130 @@ async function boot() {
         <div class="loading-icon">⚠️</div>
         <h1>Connection Error</h1>
         <p style="max-width:280px;text-align:center;color:#a0a0b8">
-          Could not connect to Firebase.<br>
-          Please check your internet connection and Firebase config in
-          <code>firebase/config.js</code>.
+          Could not reach Firebase.<br>
+          Check your internet connection.
         </p>
-        <button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;background:#7c6cf7;color:#fff;border:none;border-radius:10px;font-size:15px;cursor:pointer;font-weight:600">
+        <button onclick="location.reload()"
+          style="margin-top:16px;padding:12px 24px;background:#7c6cf7;color:#fff;
+                 border:none;border-radius:10px;font-size:15px;cursor:pointer;font-weight:600">
           Retry
         </button>
       </div>`;
   }
 }
 
-function dismissLoading() {
-  const screen = document.getElementById("loading-screen");
-  screen.classList.add("fade-out");
-  setTimeout(() => screen.remove(), 500);
+// ═══════════════════════════════════════════════
+//  AUTH FORM BINDING
+// ═══════════════════════════════════════════════
+function bindAuthForm() {
+  let isSignUp = false;
+
+  // ── Google sign-in ─────────────────────────
+  document.getElementById("google-signin-btn")?.addEventListener("click", async () => {
+    setAuthLoading(true);
+    clearAuthError();
+    try {
+      await signInWithGoogle();
+      // onAuthStateChanged fires → initApp runs automatically
+    } catch (err) {
+      showAuthError(authErrorMessage(err.code));
+      setAuthLoading(false);
+    }
+  });
+
+  // ── Toggle Sign In / Sign Up ────────────────
+  document.getElementById("auth-toggle-btn")?.addEventListener("click", () => {
+    isSignUp = !isSignUp;
+    setAuthMode(isSignUp);
+  });
+
+  // ── Email form submit ───────────────────────
+  document.getElementById("auth-form")?.addEventListener("submit", async e => {
+    e.preventDefault();
+    const email    = document.getElementById("auth-email").value.trim();
+    const password = document.getElementById("auth-password").value;
+    const name     = document.getElementById("auth-name")?.value.trim() || "";
+
+    if (!email || !password) {
+      showAuthError("Please fill in all fields.");
+      return;
+    }
+
+    setAuthLoading(true);
+    clearAuthError();
+
+    try {
+      if (isSignUp) {
+        await signUpWithEmail(email, password, name);
+      } else {
+        await signInWithEmail(email, password);
+      }
+      // onAuthStateChanged fires → initApp runs automatically
+    } catch (err) {
+      showAuthError(authErrorMessage(err.code));
+      setAuthLoading(false);
+    }
+  });
 }
 
-// ── Navigation ────────────────────────────────
+// ── Auth UI helpers ───────────────────────────
+function setAuthMode(signup) {
+  const title   = document.getElementById("auth-form-title");
+  const nameRow = document.getElementById("auth-name-row");
+  const submit  = document.getElementById("auth-submit-btn");
+  const toggle  = document.getElementById("auth-toggle-btn");
+
+  if (title)   title.textContent  = signup ? "Create Account"    : "Welcome Back";
+  if (submit)  submit.textContent = signup ? "Create Account"    : "Sign In";
+  if (toggle)  toggle.textContent = signup
+    ? "Already have an account? Sign in"
+    : "Don't have an account? Sign up";
+  if (nameRow) nameRow.classList.toggle("hidden", !signup);
+  clearAuthError();
+}
+
+function setAuthLoading(loading) {
+  const btn = document.getElementById("auth-submit-btn");
+  const ggl = document.getElementById("google-signin-btn");
+  if (btn) { btn.disabled = loading; btn.textContent = loading ? "Please wait…" : btn.dataset.label || "Sign In"; }
+  if (ggl) ggl.disabled = loading;
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById("auth-error");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.remove("hidden");
+}
+
+function clearAuthError() {
+  const el = document.getElementById("auth-error");
+  if (el) el.classList.add("hidden");
+}
+
+// ═══════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════
 function bindNavigation() {
-  // Bottom nav buttons
   document.querySelectorAll(".nav-item[data-page]").forEach(btn => {
     btn.addEventListener("click", () => navigateTo(btn.dataset.page));
   });
 
-  // FAB (+ add expense)
   document.getElementById("nav-add-btn")?.addEventListener("click", openAddExpense);
-
-  // Dashboard → Settings
   document.getElementById("settings-btn")?.addEventListener("click", () => navigateTo("settings"));
-
-  // Settings back button
   document.getElementById("settings-back-btn")?.addEventListener("click", () => navigateTo("dashboard"));
 
-  // "View All" link buttons
   document.querySelectorAll("[data-nav]").forEach(btn => {
     btn.addEventListener("click", () => navigateTo(btn.dataset.nav));
   });
 
-  // Keyboard shortcut: Escape closes modals
   document.addEventListener("keydown", e => {
     if (e.key === "Escape") closeAllModals();
   });
 
-  // Swipe-to-close on modal sheets (touch)
   initSwipeToClose();
 }
 
-// ── Swipe down to close bottom sheets ─────────
 function initSwipeToClose() {
   let startY = 0;
   document.addEventListener("touchstart", e => {
@@ -103,13 +214,9 @@ function initSwipeToClose() {
   document.addEventListener("touchend", e => {
     const sheet = e.target.closest(".modal-sheet");
     if (!sheet) return;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (dy > 80) {
+    if (e.changedTouches[0].clientY - startY > 80) {
       const modal = sheet.closest(".modal");
-      if (modal) {
-        modal.classList.remove("open");
-        document.body.style.overflow = "";
-      }
+      if (modal) { modal.classList.remove("open"); document.body.style.overflow = ""; }
     }
   }, { passive: true });
 }

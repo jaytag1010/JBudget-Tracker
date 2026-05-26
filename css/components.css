@@ -847,3 +847,206 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ══════════════════════════════════════════════
+   AUTH SCREEN
+   ══════════════════════════════════════════════ */
+.auth-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+.auth-screen.hidden { display: none; }
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Logo */
+.auth-logo {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.auth-logo-icon {
+  font-size: 48px;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+.auth-logo-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -.02em;
+  margin: 0 0 6px;
+}
+.auth-logo-sub {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Google button */
+.btn-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+.btn-google:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  border-color: rgba(124,108,247,.4);
+}
+.btn-google:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Divider */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin: 2px 0;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Form title */
+.auth-form-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 4px 0 2px;
+  text-align: center;
+}
+
+/* Auth form */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.auth-form .form-input { margin: 0; }
+
+/* Error message */
+.auth-error {
+  font-size: 13px;
+  color: var(--red);
+  text-align: center;
+  background: rgba(231,76,60,.08);
+  border: 1px solid rgba(231,76,60,.2);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin: 0;
+  line-height: 1.4;
+}
+.auth-error.hidden { display: none; }
+
+/* Toggle link */
+.auth-toggle-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  padding: 6px 0 2px;
+  transition: opacity var(--transition);
+}
+.auth-toggle-link:hover { opacity: .75; }
+
+/* ══════════════════════════════════════════════
+   USER PROFILE CARD (Settings page)
+   ══════════════════════════════════════════════ */
+.user-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 4px;
+}
+
+.user-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #a394ff);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+.user-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.user-email {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.sign-out-btn {
+  flex-shrink: 0;
+  font-size: 13px;
+  padding: 7px 14px;
+  color: var(--red);
+  border-color: rgba(231,76,60,.25);
+}
+.sign-out-btn:hover {
+  background: rgba(231,76,60,.08);
+  border-color: rgba(231,76,60,.5);
+}
