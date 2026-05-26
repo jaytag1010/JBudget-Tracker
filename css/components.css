@@ -1050,3 +1050,86 @@
   background: rgba(231,76,60,.08);
   border-color: rgba(231,76,60,.5);
 }
+
+/* ══════════════════════════════════════════════
+   INSIGHTS TOGGLE  (This Month | This Year)
+   ══════════════════════════════════════════════ */
+.insights-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px;
+  gap: 2px;
+}
+.itab {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 16px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  transition: background var(--transition), color var(--transition);
+}
+.itab.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 6px rgba(124,108,247,.35);
+}
+.itab:not(.active):hover { color: var(--text-primary); }
+
+/* ── VS Last — two-line body ── */
+.insight-vs-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 2px;
+}
+.insight-vs-pct {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.insight-vs-abs {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+
+/* ── Top Method — freq + amount rows ── */
+.insight-method-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+.method-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  line-height: 1.3;
+}
+.method-tag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--accent);
+  flex-shrink: 0;
+  min-width: 22px;
+}
+.method-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

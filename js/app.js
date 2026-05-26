@@ -6,7 +6,7 @@ import { initExpenseForm, openAddExpense, renderCategoryGrid } from "./expenses.
 import { initBudgets, updateBudgetExpenses } from "./budgets.js";
 import { initSavings } from "./savings.js";
 import { initHistory, updateHistory } from "./history.js";
-import { updateDashboard } from "./dashboard.js";
+import { updateDashboard, initInsightsToggle } from "./dashboard.js";
 import {
   initAuth, signInWithGoogle, signInWithEmail, signUpWithEmail,
   authErrorMessage,
@@ -62,6 +62,7 @@ async function initApp(user) {
     initHistory();
     await initSavings();
     initBudgets([]);
+    initInsightsToggle();
 
     listenExpenses(expenses => {
       updateDashboard(expenses);

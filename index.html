@@ -115,28 +115,43 @@
         <!-- Insights -->
         <div class="section-header">
           <h3>Insights</h3>
-          <span class="insights-period-badge">This Month</span>
+          <div class="insights-toggle" role="group" aria-label="Insight period">
+            <button class="itab active" id="insight-month-tab">This Month</button>
+            <button class="itab" id="insight-year-tab">This Year</button>
+          </div>
         </div>
         <div id="dash-insights" class="insights-grid">
           <div class="insight-card">
             <span class="insight-icon">📅</span>
-            <span class="insight-label">Peak Spending Day</span>
+            <span class="insight-label" id="insight-peak-label">Peak Spending Day</span>
             <span class="insight-value" id="insight-peak-day">—</span>
           </div>
           <div class="insight-card">
             <span class="insight-icon">📈</span>
-            <span class="insight-label">Daily Average</span>
+            <span class="insight-label" id="insight-avg-label">Daily Average</span>
             <span class="insight-value" id="insight-daily-avg">₱0.00</span>
           </div>
           <div class="insight-card">
             <span class="insight-icon">📊</span>
-            <span class="insight-label">vs Last Month</span>
-            <span class="insight-value" id="insight-vs-last">—</span>
+            <span class="insight-label" id="insight-vs-label">vs Last Month</span>
+            <div class="insight-vs-body" id="insight-vs-last">
+              <span class="insight-vs-pct" id="insight-vs-pct">—</span>
+              <span class="insight-vs-abs" id="insight-vs-abs"></span>
+            </div>
           </div>
           <div class="insight-card">
             <span class="insight-icon">💳</span>
             <span class="insight-label">Top Method</span>
-            <span class="insight-value" id="insight-top-method">—</span>
+            <div class="insight-method-body" id="insight-top-method">
+              <div class="method-row">
+                <span class="method-tag">Freq</span>
+                <span class="method-val" id="insight-method-freq">—</span>
+              </div>
+              <div class="method-row">
+                <span class="method-tag">Amt</span>
+                <span class="method-val" id="insight-method-amt">—</span>
+              </div>
+            </div>
           </div>
         </div>
 
