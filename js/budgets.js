@@ -1,24 +1,22 @@
 // ─── Budget Module ────────────────────────────
 import {
-  listenBudget, setTotalBudget, setCategoryBudget, deleteCategoryBudget
+  listenAllBudgets, setTotalBudget, setCategoryBudget, deleteCategoryBudget
 } from "../firebase/db.js";
 import { openModal, closeModal, showToast, confirmDialog, setProgressBar } from "./ui.js";
 import { formatCurrency, monthKey, monthLabel, expensesForMonth, groupByCategory, pct } from "./utils.js";
 import { getCategories } from "./settings.js";
 
-let currentMonthKey = monthKey();
-let currentBudget   = null;
-let currentExpenses = [];
-let unsubBudget     = null;
-
-// Annual mode toggle state
-let isAnnualMode = false;
+let currentMonthKey  = monthKey();
+let allBudgets       = [];   // all budget docs, sorted asc by id (YYYY-MM)
+let currentExpenses  = [];
+let unsubAllBudgets  = null;
+let isAnnualMode     = false;
 
 // ── Init ─────────────────────────────────────
 export function initBudgets(expenses) {
   currentExpenses = expenses;
   renderBudgetMonth();
-  subscribeToBudget(currentMonthKey);
+  subscribeToAllBudgets();
   bindBudgetEvents();
 }
 
@@ -27,19 +25,30 @@ export function updateBudgetExpenses(expenses) {
   renderBudgetPage();
 }
 
-// ── Month display (updates the monthly tab label) ─
+// ── Month display label ───────────────────────
 function renderBudgetMonth() {
   const el = document.getElementById("budget-month-display");
   if (el) el.textContent = monthLabel(currentMonthKey);
 }
 
-// ── Subscribe to Firestore budget doc ─────────
-function subscribeToBudget(key) {
-  unsubBudget?.();
-  unsubBudget = listenBudget(key, budget => {
-    currentBudget = budget;
+// ── Subscribe to all budget docs ──────────────
+function subscribeToAllBudgets() {
+  unsubAllBudgets?.();
+  unsubAllBudgets = listenAllBudgets(budgets => {
+    allBudgets = budgets;
     renderBudgetPage();
   });
+}
+
+// ── Carry-forward: most recent budget doc ≤ key ─
+function getEffectiveBudget(key) {
+  const eligible = allBudgets.filter(b => b.id <= key);
+  return eligible.length ? eligible[eligible.length - 1] : null;
+}
+
+// ── Is this month fully in the past? ─────────
+function isPastMonth(key) {
+  return key < monthKey();
 }
 
 // ── Router: monthly vs annual ─────────────────
@@ -52,20 +61,19 @@ export function renderBudgetPage() {
 }
 
 // ════════════════════════════════════════════
-//  MONTHLY MODE  (existing logic, unchanged)
+//  MONTHLY MODE
 // ════════════════════════════════════════════
 function renderMonthlyBudgetPage() {
-  const budget     = currentBudget;
+  const budget     = getEffectiveBudget(currentMonthKey);
   const monthExp   = expensesForMonth(currentExpenses, currentMonthKey);
   const totalSpent = monthExp.reduce((s, e) => s + Number(e.amount), 0);
   const total      = budget?.total || 0;
   const remaining  = total - totalSpent;
+  const locked     = isPastMonth(currentMonthKey);
 
-  // Period label
   const labelEl = document.getElementById("budget-period-label");
   if (labelEl) labelEl.textContent = "Monthly Budget";
 
-  // Overall card
   document.getElementById("budget-total-display").textContent   = formatCurrency(total);
   document.getElementById("budget-total-spent").textContent     = formatCurrency(totalSpent) + " spent";
   document.getElementById("budget-total-remaining").textContent = formatCurrency(Math.max(0, remaining)) + " left";
@@ -74,20 +82,43 @@ function renderMonthlyBudgetPage() {
   if (bar) {
     const p = total > 0 ? Math.min(100, Math.round((totalSpent / total) * 100)) : 0;
     bar.style.width = p + "%";
-    bar.className = "ob-bar" + (p >= 100 ? " danger" : p >= 75 ? " warn" : "");
+    bar.className   = "ob-bar" + (p >= 100 ? " danger" : p >= 75 ? " warn" : "");
   }
 
-  // Hide annual note, show action buttons
-  toggleAnnualUI(false);
-
-  // Category budget list
-  renderMonthlyCategoryBudgets(budget, monthExp);
-
-  // Sync dashboard balance card (monthly only)
+  toggleAnnualUI(false, locked);
+  renderAllocationRow(budget);
+  renderMonthlyCategoryBudgets(budget, monthExp, locked);
   syncDashboardBudget(total, totalSpent, remaining);
 }
 
-function renderMonthlyCategoryBudgets(budget, monthExp) {
+// ── Allocated / Remaining allocation row ──────
+function renderAllocationRow(budget) {
+  const el = document.getElementById("budget-allocation-row");
+  if (!el) return;
+
+  const cats      = budget?.categories || {};
+  const total     = budget?.total || 0;
+  const allocated = Object.values(cats).reduce((s, v) => s + v, 0);
+  const leftover  = total - allocated;
+
+  if (total === 0 && allocated === 0) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+
+  const allocEl  = document.getElementById("budget-allocated-amt");
+  const remainEl = document.getElementById("budget-alloc-remaining");
+  if (allocEl)  allocEl.textContent  = formatCurrency(allocated);
+  if (remainEl) remainEl.textContent = formatCurrency(leftover);
+
+  const allocBar = document.getElementById("budget-alloc-bar");
+  if (allocBar && total > 0) {
+    const p = Math.min(100, Math.round((allocated / total) * 100));
+    allocBar.style.width = p + "%";
+    allocBar.className   = "alloc-bar" + (p >= 100 ? " danger" : p >= 75 ? " warn" : "");
+  }
+}
+
+// ── Category budget cards (monthly, sortable) ─
+function renderMonthlyCategoryBudgets(budget, monthExp, locked) {
   const el = document.getElementById("budget-list");
   if (!el) return;
 
@@ -100,8 +131,11 @@ function renderMonthlyCategoryBudgets(budget, monthExp) {
     return;
   }
 
+  // Sort highest → lowest budget
+  const sorted = Object.entries(catBudgs).sort(([, a], [, b]) => b - a);
+
   el.innerHTML = "";
-  Object.entries(catBudgs).forEach(([catName, budgetAmt]) => {
+  sorted.forEach(([catName, budgetAmt]) => {
     const catSpent  = spent[catName] || 0;
     const remaining = budgetAmt - catSpent;
     const p         = pct(catSpent, budgetAmt);
@@ -114,6 +148,7 @@ function renderMonthlyCategoryBudgets(budget, monthExp) {
         <div class="bcc-left">
           <span class="bcc-icon">${cat.icon}</span>
           <span class="bcc-name">${catName}</span>
+          ${locked ? '<span class="bcc-locked-badge">🔒 Locked</span>' : ""}
         </div>
         <div class="bcc-right">
           <div class="bcc-spent ${catSpent > budgetAmt ? "red" : catSpent / budgetAmt >= .75 ? "yellow" : ""}">
@@ -127,44 +162,58 @@ function renderMonthlyCategoryBudgets(budget, monthExp) {
       </div>
       <div class="bcc-footer">
         <span>${p}% used</span>
-        <span class="${remaining < 0 ? "red" : "green"}">${remaining < 0 ? "Over by " + formatCurrency(Math.abs(remaining)) : formatCurrency(remaining) + " left"}</span>
+        <span class="${remaining < 0 ? "red" : "green"}">${remaining < 0
+          ? "Over by " + formatCurrency(Math.abs(remaining))
+          : formatCurrency(remaining) + " left"}</span>
       </div>
-      <div class="bcc-actions">
+      ${!locked ? `<div class="bcc-actions">
         <button class="btn-edit-sm btn" data-edit="${catName}">Edit</button>
         <button class="btn-del-sm btn"  data-del="${catName}">Remove</button>
-      </div>`;
+      </div>` : ""}`;
 
-    card.querySelector(`[data-edit]`).addEventListener("click", () => openEditCatBudget(catName, budgetAmt));
-    card.querySelector(`[data-del]`).addEventListener("click",  () => handleDeleteCatBudget(catName));
+    if (!locked) {
+      card.querySelector("[data-edit]").addEventListener("click", () => openEditCatBudget(catName, budgetAmt));
+      card.querySelector("[data-del]").addEventListener("click",  () => handleDeleteCatBudget(catName));
+    }
     el.appendChild(card);
   });
 }
 
 // ════════════════════════════════════════════
-//  ANNUAL MODE  (calculated, read-only)
+//  ANNUAL MODE  — historical + projected
 // ════════════════════════════════════════════
 
-/** Returns all expenses whose date falls in the given calendar year. */
-function expensesForYear(expenses, year) {
-  return expenses.filter(e => {
-    const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
-    return d.getFullYear() === year;
-  });
+function calculateAnnualTotals() {
+  const year    = new Date().getFullYear();
+  let annualTotal = 0;
+  const catAnnual = {};
+
+  for (let m = 1; m <= 12; m++) {
+    const key = `${year}-${String(m).padStart(2, "0")}`;
+    const eff = getEffectiveBudget(key);
+    if (!eff) continue;
+    annualTotal += (eff.total || 0);
+    Object.entries(eff.categories || {}).forEach(([cat, amt]) => {
+      catAnnual[cat] = (catAnnual[cat] || 0) + amt;
+    });
+  }
+  return { annualTotal, catAnnual };
 }
 
 function renderAnnualBudgetPage() {
-  const year         = new Date().getFullYear();
-  const yearExp      = expensesForYear(currentExpenses, year);
-  const totalSpent   = yearExp.reduce((s, e) => s + Number(e.amount), 0);
-  const monthlyTotal = currentBudget?.total || 0;
-  const annualTotal  = monthlyTotal * 12;
-  const remaining    = annualTotal - totalSpent;
+  const year = new Date().getFullYear();
+  const { annualTotal, catAnnual } = calculateAnnualTotals();
 
-  // Period label
+  const yearExp    = currentExpenses.filter(e => {
+    const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+    return d.getFullYear() === year;
+  });
+  const totalSpent = yearExp.reduce((s, e) => s + Number(e.amount), 0);
+  const remaining  = annualTotal - totalSpent;
+
   const labelEl = document.getElementById("budget-period-label");
   if (labelEl) labelEl.textContent = `Annual Budget (${year})`;
 
-  // Overall card
   document.getElementById("budget-total-display").textContent   = formatCurrency(annualTotal);
   document.getElementById("budget-total-spent").textContent     = formatCurrency(totalSpent) + " spent";
   document.getElementById("budget-total-remaining").textContent = formatCurrency(Math.max(0, remaining)) + " left";
@@ -173,46 +222,45 @@ function renderAnnualBudgetPage() {
   if (bar) {
     const p = annualTotal > 0 ? Math.min(100, Math.round((totalSpent / annualTotal) * 100)) : 0;
     bar.style.width = p + "%";
-    bar.className = "ob-bar" + (p >= 100 ? " danger" : p >= 75 ? " warn" : "");
+    bar.className   = "ob-bar" + (p >= 100 ? " danger" : p >= 75 ? " warn" : "");
   }
 
-  // Show annual note
   const noteEl = document.getElementById("budget-annual-note");
   if (noteEl) {
-    noteEl.textContent = monthlyTotal > 0
-      ? `Based on ${formatCurrency(monthlyTotal)}/mo × 12 months — read-only view`
+    const latest = getEffectiveBudget(monthKey());
+    noteEl.textContent = latest?.total
+      ? `Historical budgets + ${formatCurrency(latest.total)}/mo for future months — read-only view`
       : "Set a monthly budget first to see the annual projection.";
   }
 
-  // Hide action buttons in annual mode
-  toggleAnnualUI(true);
+  toggleAnnualUI(true, false);
 
-  // Render read-only annual category cards
-  renderAnnualCategoryBudgets(yearExp);
+  const allocEl = document.getElementById("budget-allocation-row");
+  if (allocEl) allocEl.classList.add("hidden");
 
-  // NOTE: do NOT sync dashboard — dashboard always shows the monthly budget
+  renderAnnualCategoryBudgets(yearExp, catAnnual);
 }
 
-function renderAnnualCategoryBudgets(yearExp) {
+function renderAnnualCategoryBudgets(yearExp, catAnnual) {
   const el = document.getElementById("budget-list");
   if (!el) return;
 
-  const cats     = getCategories();
-  const catBudgs = currentBudget?.categories || {};
-  const spent    = groupByCategory(yearExp);
+  const cats  = getCategories();
+  const spent = groupByCategory(yearExp);
 
-  if (!Object.keys(catBudgs).length) {
+  if (!Object.keys(catAnnual).length) {
     el.innerHTML = '<p class="empty-msg">No category budgets set. Switch to Monthly view to add budgets.</p>';
     return;
   }
 
+  const sorted = Object.entries(catAnnual).sort(([, a], [, b]) => b - a);
+
   el.innerHTML = "";
-  Object.entries(catBudgs).forEach(([catName, monthlyBudgetAmt]) => {
-    const annualBudget = monthlyBudgetAmt * 12;
-    const catSpent     = spent[catName] || 0;
-    const remaining    = annualBudget - catSpent;
-    const p            = pct(catSpent, annualBudget);
-    const cat          = cats.find(c => c.name === catName) || { icon: "📦", color: "#7c6cf7" };
+  sorted.forEach(([catName, annualBudget]) => {
+    const catSpent  = spent[catName] || 0;
+    const remaining = annualBudget - catSpent;
+    const p         = pct(catSpent, annualBudget);
+    const cat       = cats.find(c => c.name === catName) || { icon: "📦", color: "#7c6cf7" };
 
     const card = document.createElement("div");
     card.className = "budget-cat-card";
@@ -221,7 +269,7 @@ function renderAnnualCategoryBudgets(yearExp) {
         <div class="bcc-left">
           <span class="bcc-icon">${cat.icon}</span>
           <span class="bcc-name">${catName}</span>
-          <span class="bcc-annual-badge">×12</span>
+          <span class="bcc-annual-badge">Annual</span>
         </div>
         <div class="bcc-right">
           <div class="bcc-spent ${catSpent > annualBudget ? "red" : catSpent / annualBudget >= .75 ? "yellow" : ""}">
@@ -234,26 +282,27 @@ function renderAnnualCategoryBudgets(yearExp) {
         <div class="bcc-bar ${p >= 100 ? "danger" : p >= 75 ? "warn" : ""}" style="width:${p}%"></div>
       </div>
       <div class="bcc-footer">
-        <span>${p}% used &nbsp;·&nbsp; ${formatCurrency(monthlyBudgetAmt)}/mo</span>
-        <span class="${remaining < 0 ? "red" : "green"}">${remaining < 0 ? "Over by " + formatCurrency(Math.abs(remaining)) : formatCurrency(remaining) + " left"}</span>
+        <span>${p}% used</span>
+        <span class="${remaining < 0 ? "red" : "green"}">${remaining < 0
+          ? "Over by " + formatCurrency(Math.abs(remaining))
+          : formatCurrency(remaining) + " left"}</span>
       </div>`;
-    // No edit/delete in annual mode — calculated view only
     el.appendChild(card);
   });
 }
 
-// ── Toggle UI visibility for annual mode ──────
-function toggleAnnualUI(isAnnual) {
+// ── Toggle UI visibility for annual/locked mode ─
+function toggleAnnualUI(isAnnual, locked) {
   const editBtn    = document.getElementById("edit-total-budget-btn");
   const addCatBtn  = document.getElementById("add-cat-budget-btn");
   const annualNote = document.getElementById("budget-annual-note");
 
-  if (editBtn)    editBtn.style.visibility    = isAnnual ? "hidden" : "visible";
-  if (addCatBtn)  addCatBtn.style.visibility  = isAnnual ? "hidden" : "visible";
+  if (editBtn)    editBtn.style.visibility   = (isAnnual || locked) ? "hidden" : "visible";
+  if (addCatBtn)  addCatBtn.style.visibility = (isAnnual || locked) ? "hidden" : "visible";
   if (annualNote) annualNote.classList.toggle("hidden", !isAnnual);
 }
 
-// ── Dashboard sync (monthly budget only) ─────
+// ── Dashboard sync (monthly only) ─────────────
 function syncDashboardBudget(total, spent, remaining) {
   const remEl   = document.getElementById("dash-remaining");
   const totEl   = document.getElementById("dash-budget-total");
@@ -306,12 +355,97 @@ async function handleDeleteCatBudget(catName) {
   } catch { showToast("Error removing budget", "error"); }
 }
 
+// ── Budget Exceed Warning ─────────────────────
+function showBudgetExceedModal(monthlyTotal, newAllocation) {
+  return new Promise(resolve => {
+    const excess = newAllocation - monthlyTotal;
+    document.getElementById("exceed-monthly-total").textContent  = formatCurrency(monthlyTotal);
+    document.getElementById("exceed-new-allocation").textContent = formatCurrency(newAllocation);
+    document.getElementById("exceed-excess").textContent         = formatCurrency(excess);
+
+    const adjustBtn = document.getElementById("exceed-adjust-btn");
+    const cancelBtn = document.getElementById("exceed-cancel-btn");
+
+    function cleanup(val) {
+      closeModal("modal-budget-exceed");
+      resolve(val);
+    }
+
+    adjustBtn.onclick = () => cleanup("adjust");
+    cancelBtn.onclick = () => cleanup("cancel");
+
+    openModal("modal-budget-exceed");
+  });
+}
+
+// ── Budget Timeline ───────────────────────────
+function openBudgetTimeline() {
+  const el = document.getElementById("budget-timeline-list");
+  if (!el) return;
+
+  if (!allBudgets.length) {
+    el.innerHTML = '<p class="empty-msg">No budget history yet. Set a monthly budget to get started.</p>';
+    openModal("modal-budget-timeline");
+    return;
+  }
+
+  el.innerHTML = "";
+
+  allBudgets.forEach((budget, i) => {
+    const prevBudget = i > 0 ? allBudgets[i - 1] : null;
+    const nextBudget = allBudgets[i + 1] || null;
+
+    // Compute coverage end label
+    let coverEnd = "onwards";
+    if (nextBudget) {
+      const [yr, mo] = nextBudget.id.split("-").map(Number);
+      const d = new Date(yr, mo - 2, 1); // month before next entry
+      coverEnd = d.toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+    }
+
+    // Change badge
+    let changeTag = "";
+    if (!prevBudget) {
+      changeTag = '<span class="timeline-badge initial">Initial</span>';
+    } else {
+      const diff = (budget.total || 0) - (prevBudget.total || 0);
+      if (diff !== 0) {
+        const sign = diff > 0 ? "+" : "−";
+        changeTag = `<span class="timeline-badge ${diff > 0 ? "up" : "down"}">${sign}${formatCurrency(Math.abs(diff))}</span>`;
+      }
+    }
+
+    // Category chips
+    const catEntries = Object.entries(budget.categories || {}).sort(([, a], [, b]) => b - a);
+    const catChips   = catEntries.map(([cat, amt]) =>
+      `<span class="timeline-cat-chip">${cat}: ${formatCurrency(amt)}</span>`
+    ).join("");
+
+    const entry = document.createElement("div");
+    entry.className = "timeline-entry" + (isPastMonth(budget.id) ? " past" : "");
+    entry.innerHTML = `
+      <div class="timeline-dot"></div>
+      <div class="timeline-content">
+        <div class="timeline-month-row">
+          <span class="timeline-month">${monthLabel(budget.id)}</span>
+          ${changeTag}
+        </div>
+        <div class="timeline-budget-amt">${formatCurrency(budget.total || 0)}</div>
+        <div class="timeline-covers">Covers: ${monthLabel(budget.id)} – ${coverEnd}</div>
+        ${catChips ? `<div class="timeline-cats">${catChips}</div>` : ""}
+      </div>`;
+    el.appendChild(entry);
+  });
+
+  openModal("modal-budget-timeline");
+}
+
 // ── Bind all budget page events ───────────────
 function bindBudgetEvents() {
 
   // Monthly / Annual toggle
   document.getElementById("budget-monthly-tab")?.addEventListener("click", () => {
-    if (isAnnualMode === false) return; // already monthly
+    if (!isAnnualMode) return;
     isAnnualMode = false;
     document.getElementById("budget-monthly-tab").classList.add("active");
     document.getElementById("budget-annual-tab").classList.remove("active");
@@ -321,7 +455,7 @@ function bindBudgetEvents() {
   });
 
   document.getElementById("budget-annual-tab")?.addEventListener("click", () => {
-    if (isAnnualMode === true) return; // already annual
+    if (isAnnualMode) return;
     isAnnualMode = true;
     document.getElementById("budget-annual-tab").classList.add("active");
     document.getElementById("budget-monthly-tab").classList.remove("active");
@@ -329,6 +463,9 @@ function bindBudgetEvents() {
     document.getElementById("budget-monthly-tab").setAttribute("aria-pressed", "false");
     renderBudgetPage();
   });
+
+  // Calendar icon → Budget Timeline
+  document.getElementById("budget-month-btn")?.addEventListener("click", openBudgetTimeline);
 
   // Add category budget
   document.getElementById("add-cat-budget-btn")?.addEventListener("click", openAddCatBudget);
@@ -338,8 +475,25 @@ function bindBudgetEvents() {
     e.preventDefault();
     const catName = document.getElementById("cat-budget-category").value;
     const amount  = parseFloat(document.getElementById("cat-budget-amount").value);
-    if (!catName) { showToast("Choose a category", "error"); return; }
-    if (!amount || amount <= 0) { showToast("Enter a valid amount", "error"); return; }
+    if (!catName)              { showToast("Choose a category", "error"); return; }
+    if (!amount || amount <= 0){ showToast("Enter a valid amount", "error"); return; }
+
+    // Check budget exceed
+    const effective     = getEffectiveBudget(currentMonthKey);
+    const monthlyTotal  = effective?.total || 0;
+    const existingCats  = { ...(effective?.categories || {}) };
+    existingCats[catName] = amount;
+    const newAllocation = Object.values(existingCats).reduce((s, v) => s + v, 0);
+
+    if (monthlyTotal > 0 && newAllocation > monthlyTotal) {
+      const result = await showBudgetExceedModal(monthlyTotal, newAllocation);
+      if (result === "cancel") return;
+      if (result === "adjust") {
+        try { await setTotalBudget(currentMonthKey, newAllocation); }
+        catch { showToast("Error updating budget", "error"); return; }
+      }
+    }
+
     try {
       await setCategoryBudget(currentMonthKey, catName, amount);
       showToast("Category budget saved");
@@ -349,7 +503,8 @@ function bindBudgetEvents() {
 
   // Edit total budget
   document.getElementById("edit-total-budget-btn")?.addEventListener("click", () => {
-    document.getElementById("total-budget-amount").value = currentBudget?.total || "";
+    const effective = getEffectiveBudget(currentMonthKey);
+    document.getElementById("total-budget-amount").value = effective?.total || "";
     openModal("modal-total-budget");
   });
 

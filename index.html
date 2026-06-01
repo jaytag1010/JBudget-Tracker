@@ -203,21 +203,29 @@
     <section id="page-history" class="page">
       <header class="page-header">
         <h2 class="header-title">History</h2>
-        <span id="history-total" class="header-badge">₱0.00</span>
+        <div class="header-actions">
+          <button class="icon-btn" id="analytics-btn" aria-label="Spending Analytics" title="Spending Analytics">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="18" y="13" width="4" height="8"/></svg>
+          </button>
+          <span id="history-total" class="header-badge">₱0.00</span>
+        </div>
       </header>
 
       <div class="page-content">
         <!-- Search -->
         <div class="search-wrap">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="search-input" class="search-input" placeholder="Search transactions…">
+          <input type="text" id="search-input" class="search-input" placeholder="Search by category, note, method, or amount…">
           <button class="clear-btn hidden" id="search-clear">✕</button>
         </div>
 
-        <!-- Filters -->
-        <div class="filter-row">
+        <!-- Filters: Category | Year | Month -->
+        <div class="filter-row filter-row-3">
           <select id="filter-category" class="filter-select">
             <option value="">All Categories</option>
+          </select>
+          <select id="filter-year" class="filter-select">
+            <option value="">All Years</option>
           </select>
           <select id="filter-month" class="filter-select">
             <option value="">All Months</option>
@@ -269,6 +277,21 @@
             <span id="budget-total-remaining">₱0.00 left</span>
           </div>
           <p id="budget-annual-note" class="annual-note hidden"></p>
+        </div>
+
+        <!-- Allocated vs Remaining allocation -->
+        <div id="budget-allocation-row" class="allocation-row hidden">
+          <div class="alloc-item">
+            <span class="alloc-label">Allocated</span>
+            <span class="alloc-value accent" id="budget-allocated-amt">₱0.00</span>
+          </div>
+          <div class="alloc-bar-track">
+            <div class="alloc-bar" id="budget-alloc-bar"></div>
+          </div>
+          <div class="alloc-item right">
+            <span class="alloc-label">Remaining</span>
+            <span class="alloc-value" id="budget-alloc-remaining">₱0.00</span>
+          </div>
         </div>
 
         <!-- Per-category budgets -->
@@ -533,6 +556,65 @@
         <input type="number" id="total-budget-amount" class="form-input" placeholder="20000" min="1" required>
         <button type="submit" class="btn btn-primary full-width">Save Budget</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Budget Exceed Warning Modal -->
+  <div id="modal-budget-exceed" class="modal" role="dialog" aria-modal="true" aria-labelledby="exceed-title">
+    <div class="modal-backdrop" data-close="modal-budget-exceed"></div>
+    <div class="modal-dialog exceed-dialog">
+      <div class="exceed-icon">⚠️</div>
+      <h3 id="exceed-title">Budget Exceeded</h3>
+      <p class="exceed-sub">The new allocation exceeds your monthly budget.</p>
+      <div class="exceed-rows">
+        <div class="exceed-row">
+          <span class="exceed-label">Monthly Budget</span>
+          <span class="exceed-val" id="exceed-monthly-total">₱0.00</span>
+        </div>
+        <div class="exceed-row">
+          <span class="exceed-label">New Allocation</span>
+          <span class="exceed-val red" id="exceed-new-allocation">₱0.00</span>
+        </div>
+        <div class="exceed-row exceed-row-excess">
+          <span class="exceed-label">Excess</span>
+          <span class="exceed-val red" id="exceed-excess">₱0.00</span>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" id="exceed-cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="exceed-adjust-btn">Adjust Budget Automatically</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Budget Timeline Modal -->
+  <div id="modal-budget-timeline" class="modal" role="dialog" aria-modal="true" aria-labelledby="timeline-title">
+    <div class="modal-backdrop" data-close="modal-budget-timeline"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="timeline-title">Budget Timeline</h3>
+        <button class="icon-btn" data-close="modal-budget-timeline" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="budget-timeline-list" class="timeline-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spending Analytics Modal -->
+  <div id="modal-analytics" class="modal" role="dialog" aria-modal="true" aria-labelledby="analytics-title">
+    <div class="modal-backdrop" data-close="modal-analytics"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="analytics-title">📊 Spending Analytics</h3>
+        <button class="icon-btn" data-close="modal-analytics" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="analytics-chart" class="analytics-chart"></div>
+        <div id="analytics-summary" class="analytics-summary"></div>
+      </div>
     </div>
   </div>
 

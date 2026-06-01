@@ -176,6 +176,13 @@ export function listenBudget(monthKey, callback) {
   });
 }
 
+export function listenAllBudgets(callback) {
+  return onSnapshot(userCol(COL.budgets), snap => {
+    const budgets = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    callback(budgets.sort((a, b) => a.id.localeCompare(b.id)));
+  });
+}
+
 // ─────────────────────────────────────────────
 //  SAVINGS GOALS
 // ─────────────────────────────────────────────

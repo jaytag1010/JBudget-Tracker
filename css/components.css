@@ -1139,3 +1139,308 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ══════════════════════════════════════════════
+   V2 — History: 3-column filter row
+   ══════════════════════════════════════════════ */
+.filter-row-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+@media (max-width: 360px) {
+  .filter-row-3 { grid-template-columns: 1fr 1fr; }
+  .filter-row-3 select:first-child { grid-column: 1 / -1; }
+}
+
+/* ─── Header actions (analytics btn + badge) ── */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ══════════════════════════════════════════════
+   V2 — Budget: Allocation Row
+   ══════════════════════════════════════════════ */
+.allocation-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+}
+.alloc-item { flex-shrink: 0; min-width: 0; }
+.alloc-item.right { text-align: right; }
+.alloc-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-muted);
+  font-weight: 600;
+  display: block;
+}
+.alloc-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: block;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.alloc-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-input);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.alloc-bar {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), #a394ff);
+  width: 0%;
+  transition: width .6s ease;
+}
+.alloc-bar.warn   { background: linear-gradient(90deg, var(--yellow), var(--orange)); }
+.alloc-bar.danger { background: linear-gradient(90deg, var(--orange), var(--red)); }
+
+/* ── Locked badge on category cards ── */
+.bcc-locked-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-left: 4px;
+}
+
+/* ══════════════════════════════════════════════
+   V2 — Budget Exceed Modal
+   ══════════════════════════════════════════════ */
+.exceed-dialog {
+  background: var(--bg-card);
+  border: 1px solid rgba(231,76,60,.3);
+  border-radius: var(--radius);
+  padding: 24px 20px 20px;
+  max-width: 340px;
+  width: calc(100% - 32px);
+  text-align: center;
+}
+.exceed-icon { font-size: 40px; margin-bottom: 12px; line-height: 1; }
+.exceed-dialog h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+}
+.exceed-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 18px;
+  line-height: 1.4;
+}
+.exceed-rows {
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 20px;
+  text-align: left;
+}
+.exceed-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.exceed-row:last-child { border-bottom: none; }
+.exceed-row-excess {
+  background: rgba(231,76,60,.06);
+}
+.exceed-label { color: var(--text-secondary); font-weight: 500; }
+.exceed-val   { font-weight: 700; color: var(--text-primary); }
+
+/* ══════════════════════════════════════════════
+   V2 — Budget Timeline Modal
+   ══════════════════════════════════════════════ */
+.timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 0 8px;
+}
+.timeline-entry {
+  display: flex;
+  gap: 14px;
+  position: relative;
+  padding: 0 0 20px 0;
+}
+.timeline-entry::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 18px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.timeline-entry:last-child::before { display: none; }
+.timeline-entry.past .timeline-content { opacity: .6; }
+.timeline-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+  box-shadow: 0 0 0 3px rgba(124,108,247,.2);
+}
+.timeline-entry.past .timeline-dot {
+  background: var(--bg-input);
+  box-shadow: none;
+}
+.timeline-content { flex: 1; min-width: 0; }
+.timeline-month-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.timeline-month {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.timeline-badge {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 2px 6px;
+  letter-spacing: .04em;
+}
+.timeline-badge.initial { background: var(--accent-soft); color: var(--accent); }
+.timeline-badge.up      { background: rgba(46,204,113,.12); color: var(--green); }
+.timeline-badge.down    { background: var(--red-soft); color: var(--red); }
+.timeline-budget-amt {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 2px 0 4px;
+  letter-spacing: -.02em;
+}
+.timeline-covers {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.timeline-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+.timeline-cat-chip {
+  font-size: 11px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+  color: var(--text-secondary);
+}
+
+/* ══════════════════════════════════════════════
+   V2 — Spending Analytics Modal
+   ══════════════════════════════════════════════ */
+.analytics-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+  max-height: 55vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.chart-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+.chart-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  width: 72px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.chart-bar-wrap {
+  flex: 1;
+  height: 22px;
+  background: var(--bg-input);
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 0;
+}
+.chart-bar {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent), #a394ff);
+  transition: width .5s ease;
+  min-width: 4px;
+}
+.chart-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 80px;
+  text-align: right;
+}
+
+/* ── Analytics summary stats ── */
+.analytics-summary {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.analytics-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.analytics-stat {
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.astat-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-muted);
+}
+.astat-value {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.astat-amt {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -.01em;
+}
+.astat-amt.accent { color: var(--accent); }
+.astat-amt.green  { color: var(--green); }
