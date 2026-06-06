@@ -60,7 +60,23 @@ export async function deleteExpense(id) {
 export function listenExpenses(callback) {
   const q = query(userCol(COL.expenses), orderBy("date", "desc"));
   return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Secondary sort: within the same transaction date, newest-entered first.
+    // Uses createdAt (server timestamp set on addExpense, never updated on edits).
+    // Expenses that pre-date this feature (no createdAt) keep their existing relative order.
+    docs.sort((a, b) => {
+      const aDate = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+      const bDate = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+      const diff  = bDate - aDate;
+      if (diff !== 0) return diff;
+      // Same date — sort by createdAt DESC; missing createdAt falls to end
+      const aTs = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+      const bTs = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+      return bTs - aTs;
+    });
+
+    callback(docs);
   });
 }
 

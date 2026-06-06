@@ -65,6 +65,32 @@ export function pct(part, total) {
   return Math.min(100, Math.round((part / total) * 100));
 }
 
+// ── Safe arithmetic expression evaluator ──────
+// Accepts: digits, decimal point, +  -  *  /  ( )
+// Rejects anything else so no arbitrary JS can run.
+// Returns a rounded number, or null if invalid/unsafe.
+export function evaluateExpression(expr) {
+  if (!expr && expr !== 0) return null;
+  const cleaned = String(expr).replace(/[₱,\s]/g, "").trim();
+  if (!cleaned) return null;
+
+  // Plain number fast-path
+  const plain = Number(cleaned);
+  if (!isNaN(plain) && isFinite(plain)) return Math.round(plain * 100) / 100;
+
+  // Whitelist: only safe arithmetic characters allowed
+  if (!/^[0-9+\-*/().]+$/.test(cleaned)) return null;
+
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = new Function('"use strict"; return (' + cleaned + ')')();
+    if (typeof result !== "number" || !isFinite(result) || result < 0) return null;
+    return Math.round(result * 100) / 100;
+  } catch {
+    return null;
+  }
+}
+
 // Generate last 12 months as options
 export function lastTwelveMonths() {
   const months = [];

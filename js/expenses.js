@@ -1,7 +1,7 @@
 // ─── Expense Module ───────────────────────────
 import { addExpense, updateExpense, deleteExpense } from "../firebase/db.js";
 import { openModal, closeModal, showToast, confirmDialog } from "./ui.js";
-import { formatDate, formatDateInput, todayISO } from "./utils.js";
+import { formatDate, formatDateInput, todayISO, evaluateExpression, formatCurrency } from "./utils.js";
 import { getCategories, getPaymentMethods } from "./settings.js";
 
 let editingId = null;
@@ -80,9 +80,24 @@ export function renderPaymentChips(selected) {
 
 // ── Form submit ───────────────────────────────
 export function initExpenseForm() {
+
+  // Calculator button — evaluates the expression in the amount field
+  document.getElementById("calc-btn")?.addEventListener("click", () => {
+    const input  = document.getElementById("expense-amount");
+    const result = evaluateExpression(input.value);
+    if (result !== null) {
+      input.value = result;
+      showToast(`= ${formatCurrency(result)}`);
+    } else {
+      showToast("Invalid expression", "error");
+    }
+  });
+
   document.getElementById("expense-form").addEventListener("submit", async e => {
     e.preventDefault();
-    const amount   = parseFloat(document.getElementById("expense-amount").value);
+    // Auto-evaluate any arithmetic expression before saving
+    const raw    = (document.getElementById("expense-amount").value || "").trim();
+    const amount = evaluateExpression(raw) ?? parseFloat(raw);
     const category = document.getElementById("expense-category").value;
     const payment  = document.getElementById("expense-payment").value;
     const note     = document.getElementById("expense-note").value.trim();

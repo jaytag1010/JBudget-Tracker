@@ -505,6 +505,7 @@
   display: flex;
   align-items: center;
   background: var(--bg-input);
+  position: relative;
   border: 2px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 0 16px;
@@ -529,6 +530,37 @@
   width: 100%;
 }
 .amount-input::placeholder { color: var(--text-muted); font-weight: 400; }
+/* Give the input room so text doesn't slide under the calc button */
+.amount-input { padding-right: 44px; }
+
+/* ── Calculator button ── */
+.calc-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+.calc-btn:hover  { background: var(--accent-soft); border-color: var(--accent); }
+.calc-btn:active { background: var(--accent); color: #fff; }
+
+/* Hide browser number-spinner arrows on any remaining number inputs */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] { -moz-appearance: textfield; }
 
 /* Emoji input */
 .emoji-input {
