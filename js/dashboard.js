@@ -49,11 +49,19 @@ function updateTopCategory(expenses) {
   if (!el) return;
 
   const thisMonth = expensesForMonth(expenses, monthKey());
-  if (!thisMonth.length) { el.textContent = "—"; return; }
+  if (!thisMonth.length) {
+    el.innerHTML = "—";
+    return;
+  }
 
   const grouped = groupByCategory(thisMonth);
   const [topCat] = Object.entries(grouped).sort(([, a], [, b]) => b - a);
-  if (topCat) el.textContent = `${topCat[0]} (${formatCurrency(topCat[1])})`;
+  if (topCat) {
+    // Stacked layout: name on first line, amount on second line — prevents truncation.
+    el.innerHTML =
+      `<span class="top-cat-name">${topCat[0]}</span>` +
+      `<span class="top-cat-amt">${formatCurrency(topCat[1])}</span>`;
+  }
 }
 
 // ════════════════════════════════════════════

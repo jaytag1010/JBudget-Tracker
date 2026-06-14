@@ -634,6 +634,57 @@
     </div>
   </div>
 
+  <!-- Calculator Modal (mobile-friendly, full operator keyboard) -->
+  <div id="modal-calc" class="modal" role="dialog" aria-modal="true" aria-label="Calculator">
+    <div class="modal-backdrop" data-close="modal-calc"></div>
+    <div class="modal-sheet modal-sheet-sm">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3>Calculator</h3>
+        <button class="icon-btn" data-close="modal-calc" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body calc-modal-body">
+        <!-- Expression display -->
+        <div class="calc-display" id="calc-display">0</div>
+        <!-- Live result preview (shown when expression is valid) -->
+        <div class="calc-result" id="calc-result"></div>
+
+        <!-- Button grid: 4 columns -->
+        <div class="calc-grid">
+          <button type="button" class="calc-key calc-key-fn"  data-action="clear">C</button>
+          <button type="button" class="calc-key calc-key-fn"  data-action="backspace">⌫</button>
+          <button type="button" class="calc-key calc-key-op"  data-value="(">(</button>
+          <button type="button" class="calc-key calc-key-op"  data-value=")">)</button>
+
+          <button type="button" class="calc-key" data-value="7">7</button>
+          <button type="button" class="calc-key" data-value="8">8</button>
+          <button type="button" class="calc-key" data-value="9">9</button>
+          <button type="button" class="calc-key calc-key-op"  data-value="*">×</button>
+
+          <button type="button" class="calc-key" data-value="4">4</button>
+          <button type="button" class="calc-key" data-value="5">5</button>
+          <button type="button" class="calc-key" data-value="6">6</button>
+          <button type="button" class="calc-key calc-key-op"  data-value="-">−</button>
+
+          <button type="button" class="calc-key" data-value="1">1</button>
+          <button type="button" class="calc-key" data-value="2">2</button>
+          <button type="button" class="calc-key" data-value="3">3</button>
+          <button type="button" class="calc-key calc-key-op"  data-value="+">+</button>
+
+          <button type="button" class="calc-key" data-value=".">.</button>
+          <button type="button" class="calc-key" data-value="0">0</button>
+          <button type="button" class="calc-key calc-key-op"  data-value="/">÷</button>
+          <button type="button" class="calc-key calc-key-eq"  data-action="equals">=</button>
+        </div>
+
+        <div class="calc-actions">
+          <button type="button" class="btn btn-ghost" id="calc-cancel-btn">Cancel</button>
+          <button type="button" class="btn btn-primary" id="calc-use-btn" disabled>Use Amount</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="toast hidden" role="alert" aria-live="polite"></div>
 

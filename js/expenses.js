@@ -81,17 +81,12 @@ export function renderPaymentChips(selected) {
 // ── Form submit ───────────────────────────────
 export function initExpenseForm() {
 
-  // Calculator button — evaluates the expression in the amount field
+  // Calculator button — opens the dedicated calculator modal
   document.getElementById("calc-btn")?.addEventListener("click", () => {
-    const input  = document.getElementById("expense-amount");
-    const result = evaluateExpression(input.value);
-    if (result !== null) {
-      input.value = result;
-      showToast(`= ${formatCurrency(result)}`);
-    } else {
-      showToast("Invalid expression", "error");
-    }
+    openCalculatorModal();
   });
+
+  initCalculatorModal();
 
   document.getElementById("expense-form").addEventListener("submit", async e => {
     e.preventDefault();
@@ -142,6 +137,109 @@ export async function handleDeleteExpense(id) {
   } catch {
     showToast("Error deleting expense", "error");
   }
+}
+
+// ── Calculator Modal ──────────────────────────
+
+let _calcExpression = "";   // current expression string in the modal
+let _calcResult     = null; // evaluated result (number), or null if invalid
+
+function openCalculatorModal() {
+  const amountInput = document.getElementById("expense-amount");
+  // Pre-populate with whatever is already in the amount field
+  _calcExpression = (amountInput.value || "").trim().replace(/[₱,\s]/g, "");
+  _calcResult     = null;
+  renderCalcDisplay();
+  document.getElementById("calc-use-btn").disabled = true;
+  openModal("modal-calc");
+}
+
+function renderCalcDisplay() {
+  const displayEl = document.getElementById("calc-display");
+  const resultEl  = document.getElementById("calc-result");
+  if (!displayEl || !resultEl) return;
+
+  displayEl.textContent = _calcExpression || "0";
+
+  // Show a live result preview when the expression is complete and valid
+  const val = evaluateExpression(_calcExpression);
+  if (val !== null && String(_calcExpression) !== String(val)) {
+    // Replace internal * / with display symbols for readability
+    resultEl.textContent = `= ${formatCurrency(val)}`;
+    _calcResult = val;
+    document.getElementById("calc-use-btn").disabled = false;
+  } else if (val !== null) {
+    // Expression IS a plain number — still allow "Use Amount"
+    resultEl.textContent = "";
+    _calcResult = val;
+    document.getElementById("calc-use-btn").disabled = false;
+  } else {
+    resultEl.textContent = "";
+    _calcResult = null;
+    document.getElementById("calc-use-btn").disabled = true;
+  }
+}
+
+function initCalculatorModal() {
+  const grid     = document.getElementById("modal-calc");
+  const useBtn   = document.getElementById("calc-use-btn");
+  const cancelBtn = document.getElementById("calc-cancel-btn");
+  if (!grid) return;
+
+  // Digit / operator button taps
+  grid.querySelectorAll(".calc-key[data-value]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const v = btn.dataset.value;
+      // Prevent double-decimal in the current number segment
+      if (v === ".") {
+        // Find the last number segment (after last operator)
+        const lastSeg = _calcExpression.split(/[+\-*/()]/).pop() || "";
+        if (lastSeg.includes(".")) return;
+      }
+      _calcExpression += v;
+      renderCalcDisplay();
+    });
+  });
+
+  // Function buttons (C, ⌫, =)
+  grid.querySelectorAll(".calc-key[data-action]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      switch (btn.dataset.action) {
+        case "clear":
+          _calcExpression = "";
+          _calcResult = null;
+          renderCalcDisplay();
+          break;
+        case "backspace":
+          _calcExpression = _calcExpression.slice(0, -1);
+          renderCalcDisplay();
+          break;
+        case "equals": {
+          const val = evaluateExpression(_calcExpression);
+          if (val !== null) {
+            _calcExpression = String(val);
+            _calcResult = val;
+            renderCalcDisplay();
+          } else {
+            document.getElementById("calc-result").textContent = "Invalid expression";
+          }
+          break;
+        }
+      }
+    });
+  });
+
+  // "Use Amount" — transfer result to the expense amount field
+  useBtn?.addEventListener("click", () => {
+    if (_calcResult === null) return;
+    const amountInput = document.getElementById("expense-amount");
+    amountInput.value = _calcResult;
+    showToast(`= ${formatCurrency(_calcResult)}`);
+    closeModal("modal-calc");
+  });
+
+  // "Cancel" — close without changing the amount field
+  cancelBtn?.addEventListener("click", () => closeModal("modal-calc"));
 }
 
 // ── Build a transaction card DOM element ──────

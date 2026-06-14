@@ -85,6 +85,28 @@
   text-overflow: ellipsis;
 }
 
+/* ─── Top Category stacked layout (prevents truncation on small screens) ─── */
+#dash-top-cat {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  line-height: 1.2;
+}
+.top-cat-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+.top-cat-amt {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 2px;
+}
+
 /* ─── Transaction Card ─── */
 .transaction-list { display: flex; flex-direction: column; gap: 8px; }
 .tx-card {
@@ -552,6 +574,70 @@
 }
 .calc-btn:hover  { background: var(--accent-soft); border-color: var(--accent); }
 .calc-btn:active { background: var(--accent); color: #fff; }
+
+/* ─── Calculator Modal ─── */
+.calc-modal-body { padding: 16px 16px 20px; }
+
+.calc-display {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 26px;
+  font-weight: 700;
+  text-align: right;
+  color: var(--text-primary);
+  min-height: 54px;
+  word-break: break-all;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+.calc-result {
+  min-height: 22px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: right;
+  padding: 3px 4px 8px;
+}
+
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.calc-key {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 600;
+  height: 56px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), border-color var(--transition);
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+.calc-key:active          { background: var(--accent); color: #fff; border-color: var(--accent); }
+.calc-key-op              { color: var(--accent); }
+.calc-key-fn              { color: var(--text-secondary); background: var(--bg-input); }
+.calc-key-fn:active       { background: var(--bg-card-alt); color: var(--text-primary); border-color: var(--border); }
+.calc-key-eq              { background: var(--accent); color: #fff; border-color: var(--accent); }
+.calc-key-eq:active       { filter: brightness(1.15); }
+
+.calc-actions {
+  display: flex;
+  gap: 10px;
+}
+.calc-actions .btn { flex: 1; }
 
 /* Hide browser number-spinner arrows on any remaining number inputs */
 input[type="number"]::-webkit-inner-spin-button,
