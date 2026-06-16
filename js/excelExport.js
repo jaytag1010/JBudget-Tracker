@@ -15,12 +15,12 @@ export function exportSpendWiseWorkbook(data) {
 }
 
 function buildWorkbook(data) {
-  const expenses = (data.expenses || []).map(normalizeExpense).sort((a, b) => b.date - a.date);
+  const expenses = (data.expenses || []).map(normalizeExpense).sort((a, b) => b.sortDate - a.sortDate);
   const savings = data.savingsGoals || [];
   const budgets = data.budgets || [];
   const currentBudget = effectiveBudget(budgets, monthKey()) || {};
   const thisMonth = expensesForMonth(expenses, monthKey());
-  const thisYear = expenses.filter(e => e.date.getFullYear() === new Date().getFullYear());
+  const thisYear = expenses.filter(e => e.sortDate.getFullYear() === new Date().getFullYear());
   const byCategory = Object.entries(groupByCategory(expenses)).sort(([, a], [, b]) => b - a);
   const byMethod = groupBy(expenses, "paymentMethod");
   const totalExpenses = sumAmounts(expenses);
@@ -47,7 +47,7 @@ function buildWorkbook(data) {
 
   const expenseRows = [
     ["Date", "Amount", "Category", "Payment Method", "Note"],
-    ...expenses.map(e => [e.date, Number(e.amount || 0), e.category || "", e.paymentMethod || "", e.note || ""]),
+    ...expenses.map(e => [e.exportDate, Number(e.amount || 0), e.category || "", e.paymentMethod || "", e.note || ""]),
   ];
 
   const spentByCat = groupByCategory(thisMonth);
@@ -86,11 +86,66 @@ function sheet(name, rows, widths, options = {}) {
 }
 
 function normalizeExpense(e) {
+  const normalizedDate = normalizeDateForExport(e.date);
   return {
     ...e,
-    date: toDate(e.date),
+    date: normalizedDate.sortDate,
+    sortDate: normalizedDate.sortDate,
+    exportDate: normalizedDate.display,
     amount: Number(e.amount || 0),
   };
+}
+
+export function normalizeDateForExport(dateValue) {
+  const date = coerceExportDate(dateValue);
+  return {
+    sortDate: date,
+    display: date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
+  };
+}
+
+function coerceExportDate(value) {
+  if (!value && value !== 0) return new Date(0);
+
+  if (value?.toDate) return stripTime(value.toDate());
+
+  if (value instanceof Date) {
+    return isValidDate(value) ? stripTime(value) : new Date(0);
+  }
+
+  if (typeof value === "number" && isFinite(value)) {
+    if (value >= 30000 && value <= 80000) return excelSerialToDate(value);
+    if (value > 100000000000) return stripTime(new Date(value));
+    if (value > 1000000000) return stripTime(new Date(value * 1000));
+    return stripTime(new Date(value));
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return new Date(0);
+    const numeric = Number(trimmed);
+    if (!Number.isNaN(numeric)) return coerceExportDate(numeric);
+    const parsed = new Date(trimmed);
+    return isValidDate(parsed) ? stripTime(parsed) : new Date(0);
+  }
+
+  return new Date(0);
+}
+
+function excelSerialToDate(serial) {
+  return stripTime(new Date(Date.UTC(1899, 11, 30 + Math.floor(serial))));
+}
+
+function stripTime(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function isValidDate(date) {
+  return date instanceof Date && !Number.isNaN(date.getTime());
 }
 
 function effectiveBudget(budgets, key) {
