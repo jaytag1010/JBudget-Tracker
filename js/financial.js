@@ -1,4 +1,5 @@
 import { formatCurrency, monthKey, expensesForMonth, groupByCategory, sumAmounts, pct } from "./utils.js";
+import { notifyGenerated } from "./notifications.js";
 
 let _expenses = [];
 let _budgets = [];
@@ -21,7 +22,7 @@ export function updateFinancialSavings(goals) {
 
 function renderFinancialWidgets() {
   renderHealthScore();
-  renderOverspendingAlerts();
+  syncOverspendingNotifications();
 }
 
 function effectiveBudget(key) {
@@ -96,10 +97,7 @@ function scoreClass(score) {
   return "attention";
 }
 
-function renderOverspendingAlerts() {
-  const el = document.getElementById("dashboard-alerts");
-  if (!el) return;
-
+function syncOverspendingNotifications() {
   const { budget, expenses } = currentScope();
   const alerts = [];
   const total = Number(budget.total || 0);
@@ -111,20 +109,15 @@ function renderOverspendingAlerts() {
     addBudgetAlert(alerts, `${cat} budget`, byCat[cat] || 0, Number(amount), expenses.filter(e => e.category === cat));
   });
 
-  if (!alerts.length) {
-    el.innerHTML = '<p class="empty-msg compact">No budget warnings right now.</p>';
-    return;
-  }
-
-  el.innerHTML = "";
-  alerts.slice(0, 5).forEach(alert => {
-    const item = document.createElement("div");
-    item.className = `alert-card ${alert.level}`;
-    item.innerHTML = `
-      <div class="alert-title">${alert.title}</div>
-      <div class="alert-body">${alert.message}</div>
-      ${alert.pace ? `<div class="alert-pace">${alert.pace}</div>` : ""}`;
-    el.appendChild(item);
+  alerts.slice(0, 8).forEach(alert => {
+    notifyGenerated(alert.id, {
+      type: "budget",
+      icon: "⚠",
+      severity: alert.level,
+      title: alert.title,
+      message: [alert.message, alert.pace].filter(Boolean).join(" "),
+      sourceId: alert.id,
+    });
   });
 }
 
@@ -139,6 +132,7 @@ function addBudgetAlert(alerts, label, spent, budget, scopedExpenses) {
   const level = used >= 1 ? "danger" : used >= .95 ? "critical" : "warn";
   const projected = projectedOverage(scopedExpenses, budget);
   alerts.push({
+    id: `budget-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
     level,
     title: `${label} is ${percent}% used.`,
     message: `${formatCurrency(spent)} of ${formatCurrency(budget)} spent this month.`,

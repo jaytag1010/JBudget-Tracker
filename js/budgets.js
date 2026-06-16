@@ -6,6 +6,7 @@ import { openModal, closeModal, showToast, confirmDialog, setProgressBar } from 
 import { formatCurrency, monthKey, monthLabel, expensesForMonth, groupByCategory, pct } from "./utils.js";
 import { getCategories } from "./settings.js";
 import { updateFinancialBudgets } from "./financial.js";
+import { notifySystem } from "./notifications.js";
 
 let currentMonthKey  = monthKey();
 let allBudgets       = [];   // all budget docs, sorted asc by id (YYYY-MM)
@@ -498,6 +499,7 @@ function bindBudgetEvents() {
 
     try {
       await setCategoryBudget(currentMonthKey, catName, amount);
+      notifySystem("Budget updated", `${catName} budget set to ${formatCurrency(amount)}.`);
       showToast("Category budget saved");
       closeModal("modal-cat-budget");
     } catch { showToast("Error saving budget", "error"); }
@@ -516,6 +518,7 @@ function bindBudgetEvents() {
     if (!amount || amount <= 0) { showToast("Enter a valid amount", "error"); return; }
     try {
       await setTotalBudget(currentMonthKey, amount);
+      notifySystem("Budget updated", `Monthly budget set to ${formatCurrency(amount)}.`);
       showToast("Monthly budget saved");
       closeModal("modal-total-budget");
     } catch { showToast("Error saving budget", "error"); }

@@ -5,6 +5,7 @@ import { openModal, closeModal, showToast, confirmDialog } from "./ui.js";
 import { formatCurrency, formatDateInput, todayISO } from "./utils.js";
 import { getCategories } from "./settings.js";
 import { openAddExpense } from "./expenses.js";
+import { notifyGenerated, notifySystem } from "./notifications.js";
 
 let _items = [];
 let _editingId = null;
@@ -15,6 +16,7 @@ export function initRecurring() {
     _items = items;
     renderRecurringPage();
     renderUpcomingBills();
+    syncRecurringNotifications();
   });
 }
 
@@ -100,9 +102,11 @@ async function handleRecurringSubmit(e) {
   try {
     if (_editingId) {
       await updateRecurringExpense(_editingId, normalizeRecurring(data));
+      notifySystem("Recurring expense updated", `${data.name} was updated.`);
       showToast("Recurring expense updated");
     } else {
       await addRecurringExpense(normalizeRecurring(data));
+      notifySystem("Recurring expense added", `${data.name} reminders are active.`);
       showToast("Recurring expense added");
     }
     closeModal("modal-recurring");
@@ -138,15 +142,34 @@ function renderRecurringPage() {
         <span>Next due: ${formatShortDate(next)}</span>
         <div>
           <button class="mini-btn" data-pay="${item.id}">Pay</button>
+          <button class="mini-btn" data-toggle="${item.id}">${item.active === false ? "Enable" : "Disable"}</button>
           <button class="mini-btn" data-edit="${item.id}">Edit</button>
           <button class="mini-btn danger" data-del="${item.id}">Remove</button>
         </div>
       </div>`;
     card.querySelector("[data-pay]").addEventListener("click", () => payRecurring(item));
+    card.querySelector("[data-toggle]").addEventListener("click", () => toggleRecurring(item));
     card.querySelector("[data-edit]").addEventListener("click", () => openEditRecurring(item));
     card.querySelector("[data-del]").addEventListener("click", () => removeRecurring(item));
     el.appendChild(card);
   });
+}
+
+async function toggleRecurring(item) {
+  try {
+    await updateRecurringExpense(item.id, {
+      name: item.name,
+      amount: item.amount,
+      category: item.category,
+      frequency: item.frequency,
+      dueDate: formatDateInput(item.dueDate),
+      reminderTiming: item.reminderTiming,
+      active: item.active === false,
+    });
+    notifySystem("Recurring expense updated", `${item.name} is now ${item.active === false ? "active" : "disabled"}.`);
+  } catch {
+    showToast("Error updating recurring expense", "error");
+  }
 }
 
 function renderUpcomingBills() {
@@ -181,6 +204,25 @@ function renderUpcomingBills() {
   });
 }
 
+function syncRecurringNotifications() {
+  _items
+    .filter(item => item.active !== false)
+    .forEach(item => {
+      const due = nextDueDate(item);
+      const days = daysBetween(new Date(), due);
+      if (days < 0 || days > reminderDays(item.reminderTiming)) return;
+      const when = days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
+      notifyGenerated(`recurring-${item.id}-${due.toISOString().split("T")[0]}`, {
+        type: "recurring",
+        icon: "📅",
+        severity: days <= 1 ? "warn" : "info",
+        title: `${item.name} bill due ${when}`,
+        message: `${formatCurrency(item.amount)} due on ${formatShortDate(due)}.`,
+        sourceId: item.id,
+      });
+    });
+}
+
 function payRecurring(item, due = nextDueDate(item)) {
   openAddExpense({
     amount: item.amount,
@@ -196,6 +238,7 @@ async function removeRecurring(item) {
   if (!ok) return;
   try {
     await deleteRecurringExpense(item.id);
+    notifySystem("Recurring expense removed", `${item.name} was removed.`);
     showToast("Recurring expense removed", "info");
   } catch {
     showToast("Error removing recurring expense", "error");
@@ -233,6 +276,13 @@ function daysBetween(a, b) {
   const one = new Date(a.getFullYear(), a.getMonth(), a.getDate());
   const two = new Date(b.getFullYear(), b.getMonth(), b.getDate());
   return Math.round((two - one) / 86400000);
+}
+
+function reminderDays(value) {
+  if (value === "1-day") return 1;
+  if (value === "3-days") return 3;
+  if (value === "7-days") return 7;
+  return 0;
 }
 
 function duePhrase(item) {

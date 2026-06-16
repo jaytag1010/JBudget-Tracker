@@ -19,6 +19,7 @@ const COL = {
   savingsGoals:   "savingsGoals",
   recurring:      "recurringExpenses",
   savingsHistory: "savingsContributions",
+  notifications:  "notifications",
 };
 
 // ── UID helper ────────────────────────────────
@@ -304,6 +305,54 @@ export function listenSavingsContributions(callback) {
   });
 }
 
+// ─────────────────────────────────────────────
+//  NOTIFICATIONS
+// ─────────────────────────────────────────────
+
+export async function upsertNotification(id, data) {
+  const ref = userDoc(COL.notifications, id);
+  const snap = await getDoc(ref);
+  const prev = snap.exists() ? snap.data() : null;
+  const changed = !prev || prev.title !== data.title || prev.message !== data.message;
+  return setDoc(ref, {
+    ...data,
+    read: prev ? (changed ? false : prev.read === true) : false,
+    createdAt: prev?.createdAt || serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+export async function addSystemNotification(data) {
+  return addDoc(userCol(COL.notifications), {
+    ...data,
+    type: data.type || "system",
+    read: false,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export function listenNotifications(callback) {
+  const q = query(userCol(COL.notifications), orderBy("updatedAt", "desc"));
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export async function markAllNotificationsRead() {
+  const snap = await getDocs(userCol(COL.notifications));
+  for (const d of snap.docs) {
+    await updateDoc(d.ref, { read: true, updatedAt: serverTimestamp() });
+  }
+}
+
+export async function clearReadNotifications() {
+  const snap = await getDocs(userCol(COL.notifications));
+  for (const d of snap.docs) {
+    if (d.data().read === true) await deleteDoc(d.ref);
+  }
+}
+
 // Seed default Emergency Fund goal for a brand-new user
 export async function seedDefaultSavingsGoal() {
   const snap = await getDocs(userCol(COL.savingsGoals));
@@ -326,4 +375,13 @@ export async function resetAllData() {
     const snap = await getDocs(userCol(name));
     for (const d of snap.docs) await deleteDoc(d.ref);
   }
+}
+
+export async function exportUserData() {
+  const data = {};
+  for (const name of Object.values(COL)) {
+    const snap = await getDocs(userCol(name));
+    data[name] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }
+  return data;
 }

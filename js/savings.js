@@ -6,6 +6,7 @@ import {
 import { openModal, closeModal, showToast, confirmDialog } from "./ui.js";
 import { formatCurrency, formatDateInput, pct } from "./utils.js";
 import { updateFinancialSavings } from "./financial.js";
+import { notifyGenerated, notifySystem } from "./notifications.js";
 
 let _goals = [];
 let _contributions = [];
@@ -18,6 +19,7 @@ export async function initSavings() {
     renderSavingsPage();
     renderSavingsDashboard();
     updateFinancialSavings(goals);
+    syncSavingsNotifications();
   });
   listenSavingsContributions(items => {
     _contributions = items;
@@ -177,6 +179,7 @@ function bindSavingsEvents() {
     try {
       if (id) {
         await updateSavingsGoal(id, data);
+        notifySystem("Savings goal updated", `${name} progress was updated.`);
         showToast("Goal updated");
       } else {
         const ref = await addSavingsGoal(data);
@@ -189,10 +192,30 @@ function bindSavingsEvents() {
             date: new Date(),
           });
         }
+        notifySystem("Savings goal added", `${name} is now being tracked.`);
         showToast("Goal added");
       }
       closeModal("modal-saving");
     } catch { showToast("Error saving goal", "error"); }
+  });
+}
+
+function syncSavingsNotifications() {
+  _goals.forEach(goal => {
+    if (!goal.deadline) return;
+    const forecast = calculateForecast(goal);
+    if (forecast.status !== "Behind") return;
+    const current = Number(goal.currentAmount || 0);
+    const target = Number(goal.targetAmount || 0);
+    const remaining = Math.max(0, target - current);
+    notifyGenerated(`savings-${goal.id}-behind`, {
+      type: "savings",
+      icon: "💰",
+      severity: "warn",
+      title: `${goal.name} behind target`,
+      message: `${formatCurrency(remaining)} remaining. Estimated completion: ${forecast.dateLabel}.`,
+      sourceId: goal.id,
+    });
   });
 }
 

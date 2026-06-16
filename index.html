@@ -99,9 +99,15 @@
           <p class="header-greeting" id="greeting-text">Good morning</p>
           <h2 class="header-title">Overview</h2>
         </div>
-        <button class="icon-btn" id="settings-btn" aria-label="Settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-        </button>
+        <div class="header-actions">
+          <button class="icon-btn badge-icon-btn" id="notification-btn" aria-label="Notifications">
+            <span class="header-symbol">🔔</span>
+            <span id="notification-badge" class="notification-badge hidden">0</span>
+          </button>
+          <button class="icon-btn" id="profile-btn" aria-label="Profile">
+            <span class="header-symbol">👤</span>
+          </button>
+        </div>
       </header>
 
       <div class="page-content">
@@ -146,14 +152,6 @@
             <span class="health-label" id="budget-health-label">Fair</span>
           </div>
           <div class="health-bar-wrap"><div class="health-bar" id="budget-health-bar"></div></div>
-        </div>
-
-        <!-- Notifications -->
-        <div class="section-header">
-          <h3>Notifications</h3>
-        </div>
-        <div id="dashboard-alerts" class="alert-list">
-          <p class="empty-msg compact">No budget warnings right now.</p>
         </div>
 
         <!-- Upcoming Bills -->
@@ -297,6 +295,55 @@
       <div class="page-content">
         <div id="recurring-list" class="recurring-list">
           <p class="empty-msg">No recurring expenses yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- NOTIFICATIONS -->
+    <section id="page-notifications" class="page">
+      <header class="page-header">
+        <button class="icon-btn" data-nav="dashboard" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="header-title">Notifications</h2>
+        <div style="width:40px"></div>
+      </header>
+      <div class="page-content">
+        <div class="notification-actions">
+          <button class="btn btn-ghost" id="notification-mark-read-btn">Mark All Read</button>
+          <button class="btn btn-ghost" id="notification-clear-read-btn">Clear Read</button>
+        </div>
+        <div id="notification-list" class="notification-list">
+          <p class="empty-msg">No notifications yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROFILE -->
+    <section id="page-profile" class="page">
+      <header class="page-header">
+        <button class="icon-btn" data-nav="dashboard" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="header-title">Profile</h2>
+        <div style="width:40px"></div>
+      </header>
+      <div class="page-content">
+        <div class="profile-hero">
+          <div class="profile-avatar" id="profile-avatar"></div>
+          <div>
+            <div class="profile-name" id="profile-name">User</div>
+            <div class="profile-email" id="profile-email">—</div>
+            <div class="profile-member" id="profile-member-since">Member since —</div>
+          </div>
+        </div>
+        <div class="profile-menu">
+          <button class="profile-menu-item" data-nav="settings"><span>Settings</span><strong>›</strong></button>
+          <button class="profile-menu-item" data-nav="notifications"><span>Notifications</span><strong>›</strong></button>
+          <button class="profile-menu-item" id="profile-theme-btn"><span>Theme</span><strong>Dark</strong></button>
+          <button class="profile-menu-item" id="export-data-btn"><span>Export Data</span><strong>›</strong></button>
+          <button class="profile-menu-item" id="about-btn"><span>About</span><strong>v2.0</strong></button>
+          <button class="profile-menu-item danger" id="profile-logout-btn"><span>Logout</span><strong>›</strong></button>
         </div>
       </div>
     </section>

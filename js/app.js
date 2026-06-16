@@ -9,6 +9,7 @@ import { initHistory, updateHistory } from "./history.js";
 import { updateDashboard, initInsightsToggle } from "./dashboard.js";
 import { initRecurring } from "./recurring.js";
 import { updateFinancialExpenses } from "./financial.js";
+import { initNotifications } from "./notifications.js";
 import {
   initAuth, signInWithGoogle, signInWithEmail, signUpWithEmail,
   authErrorMessage,
@@ -65,6 +66,7 @@ async function initApp(user) {
     await initSavings();
     initBudgets([]);
     initRecurring();
+    initNotifications();
     initInsightsToggle();
 
     listenExpenses(expenses => {
@@ -195,7 +197,8 @@ function bindNavigation() {
   });
 
   document.getElementById("nav-add-btn")?.addEventListener("click", openAddExpense);
-  document.getElementById("settings-btn")?.addEventListener("click", () => navigateTo("settings"));
+  document.getElementById("notification-btn")?.addEventListener("click", () => navigateTo("notifications"));
+  document.getElementById("profile-btn")?.addEventListener("click", () => navigateTo("profile"));
   document.getElementById("settings-back-btn")?.addEventListener("click", () => navigateTo("dashboard"));
 
   document.querySelectorAll("[data-nav]").forEach(btn => {

@@ -2,7 +2,7 @@
 import {
   addCategory, updateCategory, deleteCategory, listenCategories, seedDefaultCategories,
   addPaymentMethod, updatePaymentMethod, deletePaymentMethod, listenPaymentMethods,
-  seedDefaultPaymentMethods, resetAllData,
+  seedDefaultPaymentMethods, resetAllData, exportUserData,
 } from "../firebase/db.js";
 import { openModal, closeModal, showToast, confirmDialog, renderColorPicker, CATEGORY_COLORS } from "./ui.js";
 import { signOutUser } from "./auth.js";
@@ -204,8 +204,40 @@ function bindSettingsPageEvents() {
     const ok = await confirmDialog("Sign Out", "Sign out of SpendWise?", "Sign Out");
     if (ok) signOutUser();
   });
+  document.getElementById("profile-logout-btn")?.addEventListener("click", async () => {
+    const ok = await confirmDialog("Sign Out", "Sign out of SpendWise?", "Sign Out");
+    if (ok) signOutUser();
+  });
+  document.getElementById("profile-theme-btn")?.addEventListener("click", () => {
+    showToast("Dark theme is active", "info");
+  });
+  document.getElementById("about-btn")?.addEventListener("click", () => {
+    showToast("SpendWise v2.0 financial planning release", "info");
+  });
+  document.getElementById("export-data-btn")?.addEventListener("click", handleExportData);
   bindCategoryForm();
   bindPaymentForm();
+}
+
+async function handleExportData() {
+  try {
+    const data = await exportUserData();
+    const json = JSON.stringify(data, (_, value) => {
+      if (value?.toDate) return value.toDate().toISOString();
+      return value;
+    }, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `spendwise-export-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Export ready", "success");
+  } catch (err) {
+    console.error(err);
+    showToast("Export failed", "error");
+  }
 }
 
 // ── User profile card ─────────────────────────
@@ -214,14 +246,33 @@ export function renderUserProfile(user) {
   const avatar = document.getElementById("user-avatar");
   const name   = document.getElementById("user-name");
   const email  = document.getElementById("user-email");
+  const profileAvatar = document.getElementById("profile-avatar");
+  const profileName = document.getElementById("profile-name");
+  const profileEmail = document.getElementById("profile-email");
+  const memberSince = document.getElementById("profile-member-since");
+  const displayName = user.displayName || "User";
+  const displayEmail = user.email || "";
+  const initial = (user.displayName || user.email || "?")[0].toUpperCase();
   if (avatar) {
     if (user.photoURL) {
       avatar.innerHTML = `<img src="${user.photoURL}" alt="avatar" class="avatar-img">`;
     } else {
-      const initial = (user.displayName || user.email || "?")[0].toUpperCase();
       avatar.textContent = initial;
     }
   }
-  if (name)  name.textContent  = user.displayName || "User";
-  if (email) email.textContent = user.email || "";
+  if (profileAvatar) {
+    profileAvatar.innerHTML = user.photoURL
+      ? `<img src="${user.photoURL}" alt="avatar" class="avatar-img">`
+      : initial;
+  }
+  if (name)  name.textContent  = displayName;
+  if (email) email.textContent = displayEmail;
+  if (profileName) profileName.textContent = displayName;
+  if (profileEmail) profileEmail.textContent = displayEmail;
+  if (memberSince) {
+    const created = user.metadata?.creationTime ? new Date(user.metadata.creationTime) : null;
+    memberSince.textContent = created
+      ? `Member since ${created.toLocaleDateString("en-PH", { month: "long", year: "numeric" })}`
+      : "Member since —";
+  }
 }
