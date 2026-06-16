@@ -178,11 +178,11 @@ function renderUpcomingBills() {
   const due = _items
     .filter(item => item.active !== false)
     .map(item => ({ item, due: nextDueDate(item) }))
-    .filter(({ due }) => daysBetween(new Date(), due) >= 0 && daysBetween(new Date(), due) <= 7)
+    .filter(({ due }) => daysBetween(new Date(), due) >= 0 && daysBetween(new Date(), due) <= 30)
     .sort((a, b) => a.due - b.due);
 
   if (!due.length) {
-    el.innerHTML = '<p class="empty-msg compact">No bills due in the next 7 days.</p>';
+    el.innerHTML = '<p class="empty-msg compact">No bills due in the next 30 days.</p>';
     return;
   }
 

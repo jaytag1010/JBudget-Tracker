@@ -4,6 +4,7 @@ import {
   addSystemNotification,
   markAllNotificationsRead,
   clearReadNotifications,
+  markNotificationRead,
 } from "../firebase/db.js";
 import { showToast } from "./ui.js";
 
@@ -79,6 +80,8 @@ function renderNotificationCenter() {
   _notifications.forEach(item => {
     const row = document.createElement("div");
     row.className = `notification-item ${item.read === true ? "read" : "unread"} ${item.severity || ""}`;
+    row.tabIndex = 0;
+    row.setAttribute("role", "button");
     row.innerHTML = `
       <div class="notification-icon">${item.icon || iconForType(item.type)}</div>
       <div class="notification-body">
@@ -89,8 +92,24 @@ function renderNotificationCenter() {
         <p>${item.message || ""}</p>
         <span>${formatNotificationTime(item.updatedAt || item.createdAt)}</span>
       </div>`;
+    row.addEventListener("click", () => handleNotificationOpen(item));
+    row.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        handleNotificationOpen(item);
+      }
+    });
     el.appendChild(row);
   });
+}
+
+async function handleNotificationOpen(item) {
+  if (item.read === true) return;
+  try {
+    await markNotificationRead(item.id);
+  } catch {
+    showToast("Could not mark notification read", "error");
+  }
 }
 
 function iconForType(type) {

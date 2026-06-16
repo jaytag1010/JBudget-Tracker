@@ -3,13 +3,21 @@ import {
   addCategory, updateCategory, deleteCategory, listenCategories, seedDefaultCategories,
   addPaymentMethod, updatePaymentMethod, deletePaymentMethod, listenPaymentMethods,
   seedDefaultPaymentMethods, resetAllData, exportUserData,
+  listenProfileSettings, updateProfileSettings,
 } from "../firebase/db.js";
 import { openModal, closeModal, showToast, confirmDialog, renderColorPicker, CATEGORY_COLORS } from "./ui.js";
 import { signOutUser } from "./auth.js";
+import { exportSpendWiseWorkbook } from "./excelExport.js";
 
 // ── In-memory caches (updated by real-time listeners) ──
 let _categories     = [];
 let _paymentMethods = [];
+let _authUser       = null;
+let _profileSettings = null;
+let _unsubProfile = null;
+let _pendingPhotoDataUrl = null;
+let _systemThemeMedia = null;
+let _restoreGoogleProfile = false;
 
 export const getCategories     = () => _categories;
 export const getPaymentMethods = () => _paymentMethods;
@@ -209,12 +217,32 @@ function bindSettingsPageEvents() {
     if (ok) signOutUser();
   });
   document.getElementById("profile-theme-btn")?.addEventListener("click", () => {
-    showToast("Dark theme is active", "info");
+    renderThemeOptions();
+    openModal("modal-theme");
   });
   document.getElementById("about-btn")?.addEventListener("click", () => {
     showToast("SpendWise v2.0 financial planning release", "info");
   });
   document.getElementById("export-data-btn")?.addEventListener("click", handleExportData);
+  document.getElementById("edit-profile-btn")?.addEventListener("click", openEditProfile);
+  document.getElementById("edit-profile-form")?.addEventListener("submit", handleProfileSubmit);
+  document.getElementById("profile-photo-input")?.addEventListener("change", handleProfilePhotoInput);
+  document.getElementById("remove-profile-photo-btn")?.addEventListener("click", () => {
+    _pendingPhotoDataUrl = "";
+    renderProfileEditPreview();
+  });
+  document.getElementById("restore-google-profile-btn")?.addEventListener("click", () => {
+    _pendingPhotoDataUrl = null;
+    _restoreGoogleProfile = true;
+    document.getElementById("profile-display-name-input").value = _authUser?.displayName || "";
+    renderProfileEditPreview(true);
+  });
+  document.querySelectorAll("[data-theme-choice]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await saveThemePreference(btn.dataset.themeChoice);
+      closeModal("modal-theme");
+    });
+  });
   bindCategoryForm();
   bindPaymentForm();
 }
@@ -222,17 +250,7 @@ function bindSettingsPageEvents() {
 async function handleExportData() {
   try {
     const data = await exportUserData();
-    const json = JSON.stringify(data, (_, value) => {
-      if (value?.toDate) return value.toDate().toISOString();
-      return value;
-    }, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `spendwise-export-${new Date().toISOString().split("T")[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    exportSpendWiseWorkbook(data);
     showToast("Export ready", "success");
   } catch (err) {
     console.error(err);
@@ -243,6 +261,10 @@ async function handleExportData() {
 // ── User profile card ─────────────────────────
 export function renderUserProfile(user) {
   if (!user) return;
+  _authUser = user;
+  subscribeProfileSettings();
+  renderProfileSurfaces();
+  return;
   const avatar = document.getElementById("user-avatar");
   const name   = document.getElementById("user-name");
   const email  = document.getElementById("user-email");
@@ -275,4 +297,172 @@ export function renderUserProfile(user) {
       ? `Member since ${created.toLocaleDateString("en-PH", { month: "long", year: "numeric" })}`
       : "Member since —";
   }
+}
+
+function subscribeProfileSettings() {
+  if (_unsubProfile) return;
+  _unsubProfile = listenProfileSettings(settings => {
+    _profileSettings = settings || {};
+    applyThemePreference(_profileSettings.theme || "dark");
+    renderProfileSurfaces();
+  });
+}
+
+function renderProfileSurfaces() {
+  const user = _authUser;
+  if (!user) return;
+  const avatar = document.getElementById("user-avatar");
+  const name = document.getElementById("user-name");
+  const email = document.getElementById("user-email");
+  const profileAvatar = document.getElementById("profile-avatar");
+  const profileName = document.getElementById("profile-name");
+  const profileEmail = document.getElementById("profile-email");
+  const memberSince = document.getElementById("profile-member-since");
+  const headerProfile = document.getElementById("profile-btn");
+  const displayName = _profileSettings?.displayName || user.displayName || "User";
+  const displayEmail = maskEmail(user.email || "");
+  const initial = (user.displayName || user.email || "?")[0].toUpperCase();
+  const photoUrl = resolveProfilePhoto();
+
+  if (avatar) avatar.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="avatar" class="avatar-img">` : initial;
+  if (profileAvatar) profileAvatar.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="avatar" class="avatar-img">` : initial;
+  if (headerProfile) {
+    headerProfile.innerHTML = photoUrl
+      ? `<img src="${photoUrl}" alt="Profile" class="header-profile-img">`
+      : '<span class="header-symbol">👤</span>';
+  }
+  if (name) name.textContent = displayName;
+  if (email) email.textContent = displayEmail;
+  if (profileName) profileName.textContent = displayName;
+  if (profileEmail) profileEmail.textContent = displayEmail;
+  if (memberSince) {
+    const created = user.metadata?.creationTime ? new Date(user.metadata.creationTime) : null;
+    memberSince.textContent = created
+      ? `Member since ${created.toLocaleDateString("en-PH", { month: "long", year: "numeric" })}`
+      : "Member since -";
+  }
+  updateThemeLabel(_profileSettings?.theme || "dark");
+}
+
+function resolveProfilePhoto() {
+  if (_profileSettings?.photoRemoved) return "";
+  return _profileSettings?.photoDataUrl || _authUser?.photoURL || "";
+}
+
+function maskEmail(email) {
+  if (!email || !email.includes("@")) return "";
+  const [local, domain] = email.split("@");
+  if (local.length <= 1) return `${local}@${domain}`;
+  if (local.length === 2) return `${local[0]}@${domain}`;
+  return `${local[0]}${"*".repeat(Math.max(1, local.length - 2))}${local[local.length - 1]}@${domain}`;
+}
+
+function openEditProfile() {
+  _pendingPhotoDataUrl = _profileSettings?.photoDataUrl ?? null;
+  _restoreGoogleProfile = false;
+  document.getElementById("profile-display-name-input").value =
+    _profileSettings?.displayName || _authUser?.displayName || "";
+  document.getElementById("profile-photo-input").value = "";
+  renderProfileEditPreview();
+  openModal("modal-edit-profile");
+}
+
+function renderProfileEditPreview(forceGoogle = false) {
+  const el = document.getElementById("profile-edit-preview");
+  if (!el) return;
+  const photo = forceGoogle ? (_authUser?.photoURL || "") : (_pendingPhotoDataUrl === null ? resolveProfilePhoto() : _pendingPhotoDataUrl);
+  const initial = (_authUser?.displayName || _authUser?.email || "?")[0].toUpperCase();
+  el.innerHTML = photo ? `<img src="${photo}" alt="Profile preview">` : `<span>${initial}</span>`;
+}
+
+async function handleProfilePhotoInput(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    _pendingPhotoDataUrl = await resizeImage(file, 320);
+    renderProfileEditPreview();
+  } catch {
+    showToast("Could not read image", "error");
+  }
+}
+
+async function handleProfileSubmit(e) {
+  e.preventDefault();
+  const displayName = document.getElementById("profile-display-name-input").value.trim();
+  const payload = { displayName: displayName || _authUser?.displayName || "User" };
+  if (_restoreGoogleProfile) {
+    payload.displayName = _authUser?.displayName || "User";
+    payload.photoDataUrl = "";
+    payload.photoRemoved = false;
+  } else if (_pendingPhotoDataUrl === "") {
+    payload.photoDataUrl = "";
+    payload.photoRemoved = true;
+  } else if (_pendingPhotoDataUrl !== null) {
+    payload.photoDataUrl = _pendingPhotoDataUrl;
+    payload.photoRemoved = false;
+  }
+  try {
+    await updateProfileSettings(payload);
+    closeModal("modal-edit-profile");
+    showToast("Profile updated");
+  } catch (err) {
+    console.error(err);
+    showToast("Profile update failed", "error");
+  }
+}
+
+function resizeImage(file, maxSize) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = () => { img.src = reader.result; };
+    reader.onerror = reject;
+    img.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", .82));
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function saveThemePreference(theme) {
+  try {
+    await updateProfileSettings({ theme });
+    showToast("Theme updated");
+  } catch {
+    showToast("Theme update failed", "error");
+  }
+}
+
+function applyThemePreference(theme) {
+  _systemThemeMedia ||= window.matchMedia("(prefers-color-scheme: dark)");
+  if (!_systemThemeMedia._spendwiseBound) {
+    _systemThemeMedia.addEventListener("change", () => {
+      if ((_profileSettings?.theme || "dark") === "auto") applyThemePreference("auto");
+    });
+    _systemThemeMedia._spendwiseBound = true;
+  }
+  const resolved = theme === "auto" ? (_systemThemeMedia.matches ? "dark" : "light") : theme;
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.dataset.themePreference = theme;
+  updateThemeLabel(theme);
+  renderThemeOptions();
+}
+
+function renderThemeOptions() {
+  const theme = _profileSettings?.theme || "dark";
+  document.querySelectorAll("[data-theme-choice]").forEach(btn => {
+    btn.classList.toggle("selected", btn.dataset.themeChoice === theme);
+  });
+}
+
+function updateThemeLabel(theme) {
+  const el = document.getElementById("theme-current-label");
+  if (!el) return;
+  el.textContent = theme === "auto" ? "Auto" : theme === "light" ? "Light" : "Dark";
 }

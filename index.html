@@ -156,11 +156,11 @@
 
         <!-- Upcoming Bills -->
         <div class="section-header">
-          <h3>Upcoming Bills</h3>
+          <h3>Upcoming Bills This Month</h3>
           <button class="link-btn" data-nav="recurring">View All</button>
         </div>
         <div id="upcoming-bills-list" class="upcoming-bills-list">
-          <p class="empty-msg compact">No bills due in the next 7 days.</p>
+          <p class="empty-msg compact">No bills due in the next 30 days.</p>
         </div>
 
         <!-- Insights -->
@@ -335,12 +335,13 @@
             <div class="profile-name" id="profile-name">User</div>
             <div class="profile-email" id="profile-email">—</div>
             <div class="profile-member" id="profile-member-since">Member since —</div>
+            <button class="link-btn" id="edit-profile-btn">Edit Profile</button>
           </div>
         </div>
         <div class="profile-menu">
           <button class="profile-menu-item" data-nav="settings"><span>Settings</span><strong>›</strong></button>
           <button class="profile-menu-item" data-nav="notifications"><span>Notifications</span><strong>›</strong></button>
-          <button class="profile-menu-item" id="profile-theme-btn"><span>Theme</span><strong>Dark</strong></button>
+          <button class="profile-menu-item" id="profile-theme-btn"><span>Theme</span><strong id="theme-current-label">Dark</strong></button>
           <button class="profile-menu-item" id="export-data-btn"><span>Export Data</span><strong>›</strong></button>
           <button class="profile-menu-item" id="about-btn"><span>About</span><strong>v2.0</strong></button>
           <button class="profile-menu-item danger" id="profile-logout-btn"><span>Logout</span><strong>›</strong></button>
@@ -823,6 +824,49 @@
         </label>
         <button type="submit" class="btn btn-primary full-width">Save Recurring Expense</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Edit Profile Modal -->
+  <div id="modal-edit-profile" class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
+    <div class="modal-backdrop" data-close="modal-edit-profile"></div>
+    <div class="modal-sheet modal-sheet-sm">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="edit-profile-title">Edit Profile</h3>
+        <button class="icon-btn" data-close="modal-edit-profile" aria-label="Close">✕</button>
+      </div>
+      <form id="edit-profile-form" class="modal-body" novalidate>
+        <div class="profile-edit-preview" id="profile-edit-preview"></div>
+        <label class="form-label">Display Name</label>
+        <input type="text" id="profile-display-name-input" class="form-input" placeholder="Display name">
+        <label class="form-label">Profile Picture</label>
+        <input type="file" id="profile-photo-input" class="form-input" accept="image/*">
+        <div class="profile-edit-actions">
+          <button type="button" class="btn btn-ghost" id="remove-profile-photo-btn">Remove Picture</button>
+          <button type="button" class="btn btn-ghost" id="restore-google-profile-btn">Restore Google</button>
+        </div>
+        <button type="submit" class="btn btn-primary full-width">Save Profile</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Theme Modal -->
+  <div id="modal-theme" class="modal" role="dialog" aria-modal="true" aria-labelledby="theme-title">
+    <div class="modal-backdrop" data-close="modal-theme"></div>
+    <div class="modal-sheet modal-sheet-sm">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="theme-title">Theme</h3>
+        <button class="icon-btn" data-close="modal-theme" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="theme-options">
+          <button type="button" class="theme-option" data-theme-choice="dark">Dark</button>
+          <button type="button" class="theme-option" data-theme-choice="light">Light</button>
+          <button type="button" class="theme-option" data-theme-choice="auto">Auto Detect</button>
+        </div>
+      </div>
     </div>
   </div>
 

@@ -20,6 +20,7 @@ const COL = {
   recurring:      "recurringExpenses",
   savingsHistory: "savingsContributions",
   notifications:  "notifications",
+  profileSettings:"profileSettings",
 };
 
 // ── UID helper ────────────────────────────────
@@ -351,6 +352,30 @@ export async function clearReadNotifications() {
   for (const d of snap.docs) {
     if (d.data().read === true) await deleteDoc(d.ref);
   }
+}
+
+export async function markNotificationRead(id) {
+  return updateDoc(userDoc(COL.notifications, id), {
+    read: true,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// ─────────────────────────────────────────────
+//  PROFILE SETTINGS
+// ─────────────────────────────────────────────
+
+export function listenProfileSettings(callback) {
+  return onSnapshot(userDoc(COL.profileSettings, "profile"), snap => {
+    callback(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+  });
+}
+
+export async function updateProfileSettings(data) {
+  return setDoc(userDoc(COL.profileSettings, "profile"), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
 }
 
 // Seed default Emergency Fund goal for a brand-new user
