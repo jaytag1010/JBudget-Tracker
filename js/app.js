@@ -7,6 +7,8 @@ import { initBudgets, updateBudgetExpenses } from "./budgets.js";
 import { initSavings } from "./savings.js";
 import { initHistory, updateHistory } from "./history.js";
 import { updateDashboard, initInsightsToggle } from "./dashboard.js";
+import { initRecurring } from "./recurring.js";
+import { updateFinancialExpenses } from "./financial.js";
 import {
   initAuth, signInWithGoogle, signInWithEmail, signUpWithEmail,
   authErrorMessage,
@@ -62,12 +64,14 @@ async function initApp(user) {
     initHistory();
     await initSavings();
     initBudgets([]);
+    initRecurring();
     initInsightsToggle();
 
     listenExpenses(expenses => {
       updateDashboard(expenses);
       updateHistory(expenses);
       updateBudgetExpenses(expenses);
+      updateFinancialExpenses(expenses);
     });
 
     onCategoriesChanged(() => renderCategoryGrid(null));

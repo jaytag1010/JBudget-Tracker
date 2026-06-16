@@ -5,6 +5,7 @@ import {
 import { openModal, closeModal, showToast, confirmDialog, setProgressBar } from "./ui.js";
 import { formatCurrency, monthKey, monthLabel, expensesForMonth, groupByCategory, pct } from "./utils.js";
 import { getCategories } from "./settings.js";
+import { updateFinancialBudgets } from "./financial.js";
 
 let currentMonthKey  = monthKey();
 let allBudgets       = [];   // all budget docs, sorted asc by id (YYYY-MM)
@@ -36,6 +37,7 @@ function subscribeToAllBudgets() {
   unsubAllBudgets?.();
   unsubAllBudgets = listenAllBudgets(budgets => {
     allBudgets = budgets;
+    updateFinancialBudgets(budgets);
     renderBudgetPage();
   });
 }

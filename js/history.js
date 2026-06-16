@@ -5,6 +5,7 @@ import { getCategories } from "./settings.js";
 import { openModal } from "./ui.js";
 
 let _allExpenses = [];
+let _calendarDate = new Date();
 
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
@@ -14,6 +15,10 @@ const MONTH_NAMES = [
 export function initHistory() {
   populateMonthNameFilter();
   bindHistoryFilters();
+  bindCalendarEvents();
+  document.addEventListener("spendwise:category-insight", e => {
+    if (e.detail?.category) openCategoryInsight(e.detail.category);
+  });
 }
 
 export function updateHistory(expenses) {
@@ -123,6 +128,7 @@ function applyFilters() {
 
   const list = document.getElementById("history-list");
   if (list) renderExpenseList(list, filtered);
+  renderSpendingCalendar(filtered);
 
   const total = filtered.reduce((s, e) => s + Number(e.amount || 0), 0);
   const badge = document.getElementById("history-total");
@@ -131,6 +137,124 @@ function applyFilters() {
   const rawSearch = document.getElementById("search-input")?.value || "";
   const clearBtn  = document.getElementById("search-clear");
   if (clearBtn) clearBtn.classList.toggle("hidden", !rawSearch);
+}
+
+function bindCalendarEvents() {
+  document.getElementById("calendar-prev-btn")?.addEventListener("click", () => {
+    _calendarDate = new Date(_calendarDate.getFullYear(), _calendarDate.getMonth() - 1, 1);
+    applyFilters();
+  });
+  document.getElementById("calendar-next-btn")?.addEventListener("click", () => {
+    _calendarDate = new Date(_calendarDate.getFullYear(), _calendarDate.getMonth() + 1, 1);
+    applyFilters();
+  });
+}
+
+function renderSpendingCalendar(filteredExpenses) {
+  const grid = document.getElementById("spending-calendar");
+  const title = document.getElementById("calendar-title");
+  if (!grid) return;
+
+  const year = _calendarDate.getFullYear();
+  const month = _calendarDate.getMonth();
+  if (title) {
+    title.textContent = _calendarDate.toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+  }
+
+  const byDay = {};
+  filteredExpenses.forEach(e => {
+    const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+    if (d.getFullYear() !== year || d.getMonth() !== month) return;
+    const day = d.getDate();
+    if (!byDay[day]) byDay[day] = { total: 0, expenses: [] };
+    byDay[day].total += Number(e.amount || 0);
+    byDay[day].expenses.push(e);
+  });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const days = new Date(year, month + 1, 0).getDate();
+  grid.innerHTML = "";
+
+  for (let i = 0; i < firstDay; i++) {
+    const empty = document.createElement("div");
+    empty.className = "calendar-day empty";
+    grid.appendChild(empty);
+  }
+
+  for (let day = 1; day <= days; day++) {
+    const data = byDay[day];
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "calendar-day" + (data ? " has-spend" : "");
+    btn.innerHTML = `<span>${day}</span>${data ? `<strong>${formatCurrency(data.total)}</strong>` : ""}`;
+    if (data) btn.addEventListener("click", () => openDayExpenses(year, month, day, data.expenses, data.total));
+    grid.appendChild(btn);
+  }
+}
+
+function openDayExpenses(year, month, day, expenses, total) {
+  const title = document.getElementById("day-expenses-title");
+  const list = document.getElementById("day-expenses-list");
+  if (!list) return;
+  const date = new Date(year, month, day);
+  if (title) title.textContent = date.toLocaleDateString("en-PH", { month: "long", day: "numeric" });
+
+  const rows = expenses
+    .sort((a, b) => String(a.category).localeCompare(String(b.category)))
+    .map(e => `<div class="day-expense-row"><span>${e.category}</span><strong>${formatCurrency(e.amount)}</strong></div>`)
+    .join("");
+  list.innerHTML = `${rows}<div class="day-expense-total"><span>Total</span><strong>${formatCurrency(total)}</strong></div>`;
+  openModal("modal-day-expenses");
+}
+
+function openCategoryInsight(category) {
+  const title = document.getElementById("category-insight-title");
+  const body = document.getElementById("category-insight-body");
+  if (!body) return;
+  if (title) title.textContent = category;
+
+  const now = new Date();
+  const thisKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastKey = `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, "0")}`;
+  const monthlyTotals = {};
+
+  _allExpenses.filter(e => e.category === category).forEach(e => {
+    const d = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    monthlyTotals[key] = (monthlyTotals[key] || 0) + Number(e.amount || 0);
+  });
+
+  const totals = Object.values(monthlyTotals);
+  const thisMonth = monthlyTotals[thisKey] || 0;
+  const lastMonth = monthlyTotals[lastKey] || 0;
+  const average = totals.length ? totals.reduce((s, v) => s + v, 0) / totals.length : 0;
+  const trend = lastMonth ? ((thisMonth - lastMonth) / lastMonth) * 100 : 0;
+  const trendDown = trend < 0;
+  const recent = Object.entries(monthlyTotals).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
+  const max = Math.max(...recent.map(([, v]) => v), 1);
+
+  body.innerHTML = `
+    <div class="category-insight-grid">
+      <div><span>This Month</span><strong>${formatCurrency(thisMonth)}</strong></div>
+      <div><span>Last Month</span><strong>${formatCurrency(lastMonth)}</strong></div>
+      <div><span>Monthly Average</span><strong>${formatCurrency(average)}</strong></div>
+      <div><span>Trend</span><strong class="${trendDown ? "green" : "red"}">${trendDown ? "↓" : "↑"} ${Math.abs(Math.round(trend))}%</strong></div>
+    </div>
+    <div class="mini-chart">
+      ${recent.map(([key, value]) => `
+        <div class="mini-chart-row">
+          <span>${formatMonthKey(key)}</span>
+          <div><i style="width:${Math.max(4, Math.round((value / max) * 100))}%"></i></div>
+          <strong>${formatCurrency(value)}</strong>
+        </div>`).join("") || '<p class="empty-msg compact">No category spending yet.</p>'}
+    </div>`;
+  openModal("modal-category-insight");
+}
+
+function formatMonthKey(key) {
+  const [year, month] = key.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("en-PH", { month: "short" });
 }
 
 // ── Spending Analytics ────────────────────────

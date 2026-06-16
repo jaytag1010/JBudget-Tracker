@@ -1,5 +1,5 @@
 // ─── Expense Module ───────────────────────────
-import { addExpense, updateExpense, deleteExpense } from "../firebase/db.js";
+import { addExpense, updateExpense, deleteExpense, addRecurringExpense } from "../firebase/db.js";
 import { openModal, closeModal, showToast, confirmDialog } from "./ui.js";
 import { formatDate, formatDateInput, todayISO, evaluateExpression, formatCurrency } from "./utils.js";
 import { getCategories, getPaymentMethods } from "./settings.js";
@@ -7,16 +7,22 @@ import { getCategories, getPaymentMethods } from "./settings.js";
 let editingId = null;
 
 // ── Open "Add Expense" modal ──────────────────
-export function openAddExpense() {
+export function openAddExpense(prefill = {}) {
   editingId = null;
   document.getElementById("modal-expense-title").textContent = "Add Expense";
   document.getElementById("expense-submit-btn").textContent  = "Save Expense";
   document.getElementById("expense-form").reset();
   document.getElementById("expense-id").value     = "";
-  document.getElementById("expense-date").value   = todayISO();
-  document.getElementById("expense-category").value = "";
+  document.getElementById("expense-amount").value = prefill.amount || "";
+  document.getElementById("expense-note").value   = prefill.note || "";
+  document.getElementById("expense-date").value   = prefill.date || todayISO();
+  document.getElementById("expense-category").value = prefill.category || "";
   document.getElementById("expense-payment").value  = "";
-  renderCategoryGrid(null);
+  document.getElementById("expense-recurring").checked = false;
+  document.getElementById("expense-recurring-fields").classList.add("hidden");
+  document.getElementById("expense-recurring-due").value = prefill.date || todayISO();
+  document.getElementById("expense-recurring-name").value = prefill.note || "";
+  renderCategoryGrid(prefill.category || null);
   renderPaymentChips(null);
   openModal("modal-expense");
   document.getElementById("expense-amount").focus();
@@ -33,6 +39,8 @@ export function openEditExpense(expense) {
   document.getElementById("expense-date").value   = formatDateInput(expense.date);
   document.getElementById("expense-category").value = expense.category || "";
   document.getElementById("expense-payment").value  = expense.paymentMethod || "";
+  document.getElementById("expense-recurring").checked = false;
+  document.getElementById("expense-recurring-fields").classList.add("hidden");
   renderCategoryGrid(expense.category);
   renderPaymentChips(expense.paymentMethod);
   openModal("modal-expense");
@@ -88,6 +96,15 @@ export function initExpenseForm() {
 
   initCalculatorModal();
 
+  document.getElementById("expense-recurring")?.addEventListener("change", e => {
+    const fields = document.getElementById("expense-recurring-fields");
+    fields?.classList.toggle("hidden", !e.target.checked);
+    if (e.target.checked) {
+      document.getElementById("expense-recurring-due").value ||= document.getElementById("expense-date").value || todayISO();
+      document.getElementById("expense-recurring-name").value ||= document.getElementById("expense-note").value.trim();
+    }
+  });
+
   document.getElementById("expense-form").addEventListener("submit", async e => {
     e.preventDefault();
     // Auto-evaluate any arithmetic expression before saving
@@ -114,6 +131,18 @@ export function initExpenseForm() {
         showToast("Expense updated");
       } else {
         await addExpense(data);
+        if (document.getElementById("expense-recurring")?.checked) {
+          const recurringName = document.getElementById("expense-recurring-name").value.trim() || note || category;
+          const dueDate = document.getElementById("expense-recurring-due").value || date;
+          await addRecurringExpense({
+            name: recurringName,
+            amount,
+            category,
+            frequency: document.getElementById("expense-recurring-frequency").value,
+            dueDate,
+            reminderTiming: document.getElementById("expense-recurring-reminder").value,
+          });
+        }
         showToast("Expense added");
       }
       closeModal("modal-expense");
@@ -253,7 +282,7 @@ export function buildTxCard(expense) {
   card.innerHTML = `
     <div class="tx-icon" style="background:${cat.color}22">${cat.icon}</div>
     <div class="tx-info">
-      <div class="tx-cat">${expense.category}</div>
+      <button type="button" class="tx-cat tx-cat-action" data-category="${expense.category}">${expense.category}</button>
       <div class="tx-meta">${expense.paymentMethod}${expense.note ? " · " + expense.note : ""}</div>
     </div>
     <div class="tx-right">
@@ -263,6 +292,12 @@ export function buildTxCard(expense) {
 
   // Long-press / tap to edit
   card.addEventListener("click", () => openEditExpense(expense));
+  card.querySelector(".tx-cat-action")?.addEventListener("click", e => {
+    e.stopPropagation();
+    document.dispatchEvent(new CustomEvent("spendwise:category-insight", {
+      detail: { category: expense.category },
+    }));
+  });
 
   return card;
 }

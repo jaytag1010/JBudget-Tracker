@@ -136,6 +136,35 @@
           </div>
         </div>
 
+        <!-- Budget Health -->
+        <div class="health-card" id="budget-health-detail">
+          <div class="health-top">
+            <div>
+              <span class="health-kicker">Budget Health</span>
+              <div class="health-score" id="budget-health-score">0 / 100</div>
+            </div>
+            <span class="health-label" id="budget-health-label">Fair</span>
+          </div>
+          <div class="health-bar-wrap"><div class="health-bar" id="budget-health-bar"></div></div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="section-header">
+          <h3>Notifications</h3>
+        </div>
+        <div id="dashboard-alerts" class="alert-list">
+          <p class="empty-msg compact">No budget warnings right now.</p>
+        </div>
+
+        <!-- Upcoming Bills -->
+        <div class="section-header">
+          <h3>Upcoming Bills</h3>
+          <button class="link-btn" data-nav="recurring">View All</button>
+        </div>
+        <div id="upcoming-bills-list" class="upcoming-bills-list">
+          <p class="empty-msg compact">No bills due in the next 7 days.</p>
+        </div>
+
         <!-- Insights -->
         <div class="section-header">
           <h3>Insights</h3>
@@ -232,8 +261,42 @@
           </select>
         </div>
 
+        <div class="calendar-panel">
+          <div class="calendar-header">
+            <button class="icon-btn" id="calendar-prev-btn" aria-label="Previous month">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div class="calendar-title" id="calendar-title">Calendar</div>
+            <button class="icon-btn" id="calendar-next-btn" aria-label="Next month">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+          </div>
+          <div id="spending-calendar" class="spending-calendar"></div>
+        </div>
+
         <div id="history-list" class="transaction-list">
           <p class="empty-msg">No transactions found.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- RECURRING -->
+    <section id="page-recurring" class="page">
+      <header class="page-header">
+        <button class="icon-btn" data-nav="dashboard" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="header-title">Recurring Expenses</h2>
+        <button class="icon-btn" id="add-recurring-btn" aria-label="Add recurring expense">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </header>
+      <div class="page-content">
+        <div id="recurring-list" class="recurring-list">
+          <p class="empty-msg">No recurring expenses yet.</p>
         </div>
       </div>
     </section>
@@ -453,6 +516,30 @@
         <label class="form-label">Date</label>
         <input type="date" id="expense-date" class="form-input" required>
 
+        <label class="check-row">
+          <input type="checkbox" id="expense-recurring">
+          <span>Make Recurring</span>
+        </label>
+        <div id="expense-recurring-fields" class="recurring-inline hidden">
+          <label class="form-label">Recurring Name</label>
+          <input type="text" id="expense-recurring-name" class="form-input" placeholder="e.g. Internet">
+          <label class="form-label">Frequency</label>
+          <select id="expense-recurring-frequency" class="form-input">
+            <option value="weekly">Weekly</option>
+            <option value="monthly" selected>Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+          <label class="form-label">Due Date</label>
+          <input type="date" id="expense-recurring-due" class="form-input">
+          <label class="form-label">Reminder Timing</label>
+          <select id="expense-recurring-reminder" class="form-input">
+            <option value="same-day">Same day</option>
+            <option value="1-day">1 day before</option>
+            <option value="3-days">3 days before</option>
+            <option value="7-days">7 days before</option>
+          </select>
+        </div>
+
         <button type="submit" class="btn btn-primary full-width" id="expense-submit-btn">Save Expense</button>
       </form>
     </div>
@@ -618,6 +705,77 @@
         <div id="analytics-chart" class="analytics-chart"></div>
         <div id="analytics-summary" class="analytics-summary"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Day Expenses Modal -->
+  <div id="modal-day-expenses" class="modal" role="dialog" aria-modal="true" aria-labelledby="day-expenses-title">
+    <div class="modal-backdrop" data-close="modal-day-expenses"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="day-expenses-title">Expenses</h3>
+        <button class="icon-btn" data-close="modal-day-expenses" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="day-expenses-list" class="day-expenses-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Insights Modal -->
+  <div id="modal-category-insight" class="modal" role="dialog" aria-modal="true" aria-labelledby="category-insight-title">
+    <div class="modal-backdrop" data-close="modal-category-insight"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="category-insight-title">Category Insights</h3>
+        <button class="icon-btn" data-close="modal-category-insight" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="category-insight-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Recurring Modal -->
+  <div id="modal-recurring" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-recurring-title">
+    <div class="modal-backdrop" data-close="modal-recurring"></div>
+    <div class="modal-sheet modal-sheet-sm">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="modal-recurring-title">Add Recurring Expense</h3>
+        <button class="icon-btn" data-close="modal-recurring" aria-label="Close">✕</button>
+      </div>
+      <form id="recurring-form" class="modal-body" novalidate>
+        <input type="hidden" id="recurring-id">
+        <label class="form-label">Name</label>
+        <input type="text" id="recurring-name" class="form-input" placeholder="e.g. House Rent" required>
+        <label class="form-label">Amount (₱)</label>
+        <input type="number" id="recurring-amount" class="form-input" placeholder="6000" min="1" required>
+        <label class="form-label">Category</label>
+        <select id="recurring-category" class="form-input" required></select>
+        <label class="form-label">Frequency</label>
+        <select id="recurring-frequency" class="form-input">
+          <option value="weekly">Weekly</option>
+          <option value="monthly" selected>Monthly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+        <label class="form-label">Due Date</label>
+        <input type="date" id="recurring-due" class="form-input" required>
+        <label class="form-label">Reminder Timing</label>
+        <select id="recurring-reminder" class="form-input">
+          <option value="same-day">Same day</option>
+          <option value="1-day">1 day before</option>
+          <option value="3-days">3 days before</option>
+          <option value="7-days">7 days before</option>
+        </select>
+        <label class="check-row">
+          <input type="checkbox" id="recurring-active" checked>
+          <span>Keep reminders active</span>
+        </label>
+        <button type="submit" class="btn btn-primary full-width">Save Recurring Expense</button>
+      </form>
     </div>
   </div>
 

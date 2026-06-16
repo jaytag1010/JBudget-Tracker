@@ -17,6 +17,8 @@ const COL = {
   paymentMethods: "paymentMethods",
   budgets:        "budgets",
   savingsGoals:   "savingsGoals",
+  recurring:      "recurringExpenses",
+  savingsHistory: "savingsContributions",
 };
 
 // ── UID helper ────────────────────────────────
@@ -200,6 +202,43 @@ export function listenAllBudgets(callback) {
 }
 
 // ─────────────────────────────────────────────
+//  RECURRING EXPENSES
+// ─────────────────────────────────────────────
+
+export async function addRecurringExpense(data) {
+  return addDoc(userCol(COL.recurring), {
+    ...data,
+    amount: Number(data.amount),
+    dueDate: Timestamp.fromDate(new Date(data.dueDate)),
+    active: data.active !== false,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateRecurringExpense(id, data) {
+  const payload = {
+    ...data,
+    amount: Number(data.amount),
+    dueDate: Timestamp.fromDate(new Date(data.dueDate)),
+    active: data.active !== false,
+    updatedAt: serverTimestamp(),
+  };
+  return updateDoc(userDoc(COL.recurring, id), payload);
+}
+
+export async function deleteRecurringExpense(id) {
+  return deleteDoc(userDoc(COL.recurring, id));
+}
+
+export function listenRecurringExpenses(callback) {
+  const q = query(userCol(COL.recurring), orderBy("createdAt", "asc"));
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+// ─────────────────────────────────────────────
 //  SAVINGS GOALS
 // ─────────────────────────────────────────────
 
@@ -214,13 +253,26 @@ export async function addSavingsGoal(data) {
 }
 
 export async function updateSavingsGoal(id, data) {
+  const before = await getDoc(userDoc(COL.savingsGoals, id));
+  const oldAmount = before.exists() ? Number(before.data().currentAmount || 0) : 0;
+  const newAmount = Number(data.currentAmount || 0);
   const payload = {
     ...data,
     targetAmount:  Number(data.targetAmount),
-    currentAmount: Number(data.currentAmount || 0),
+    currentAmount: newAmount,
   };
   payload.deadline = data.deadline ? Timestamp.fromDate(new Date(data.deadline)) : null;
-  return updateDoc(userDoc(COL.savingsGoals, id), payload);
+  await updateDoc(userDoc(COL.savingsGoals, id), payload);
+  const delta = newAmount - oldAmount;
+  if (delta !== 0) {
+    await addSavingsContribution({
+      goalId: id,
+      goalName: data.name,
+      amount: delta,
+      currentAmount: newAmount,
+      date: new Date(),
+    });
+  }
 }
 
 export async function deleteSavingsGoal(id) {
@@ -229,6 +281,24 @@ export async function deleteSavingsGoal(id) {
 
 export function listenSavingsGoals(callback) {
   const q = query(userCol(COL.savingsGoals), orderBy("createdAt", "asc"));
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export async function addSavingsContribution(data) {
+  return addDoc(userCol(COL.savingsHistory), {
+    goalId: data.goalId,
+    goalName: data.goalName || "",
+    amount: Number(data.amount),
+    currentAmount: Number(data.currentAmount || 0),
+    date: Timestamp.fromDate(data.date instanceof Date ? data.date : new Date(data.date || Date.now())),
+    createdAt: serverTimestamp(),
+  });
+}
+
+export function listenSavingsContributions(callback) {
+  const q = query(userCol(COL.savingsHistory), orderBy("date", "asc"));
   return onSnapshot(q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });

@@ -1,12 +1,14 @@
 // ─── Savings Module ───────────────────────────
 import {
   listenSavingsGoals, addSavingsGoal, updateSavingsGoal, deleteSavingsGoal,
-  seedDefaultSavingsGoal
+  seedDefaultSavingsGoal, listenSavingsContributions, addSavingsContribution
 } from "../firebase/db.js";
 import { openModal, closeModal, showToast, confirmDialog } from "./ui.js";
 import { formatCurrency, formatDateInput, pct } from "./utils.js";
+import { updateFinancialSavings } from "./financial.js";
 
 let _goals = [];
+let _contributions = [];
 
 // ── Init ──────────────────────────────────────
 export async function initSavings() {
@@ -15,6 +17,11 @@ export async function initSavings() {
     _goals = goals;
     renderSavingsPage();
     renderSavingsDashboard();
+    updateFinancialSavings(goals);
+  });
+  listenSavingsContributions(items => {
+    _contributions = items;
+    renderSavingsPage();
   });
   bindSavingsEvents();
 }
@@ -45,6 +52,7 @@ function buildSavingCard(goal) {
   const p        = pct(current, target);
   const remaining = Math.max(0, target - current);
   const complete  = p >= 100;
+  const forecast  = calculateForecast(goal);
 
   const card = document.createElement("div");
   card.className = "saving-card";
@@ -80,6 +88,13 @@ function buildSavingCard(goal) {
     <div class="saving-footer">
       <span class="saving-pct">${p}% complete</span>
       <span>${complete ? "Goal reached! 🎉" : formatCurrency(remaining) + " to go"}</span>
+    </div>
+    <div class="saving-forecast">
+      <div>
+        <span class="forecast-label">Estimated Completion</span>
+        <strong>${forecast.dateLabel}</strong>
+      </div>
+      <span class="forecast-status ${forecast.statusClass}">${forecast.status}</span>
     </div>`;
 
   card.querySelector(`[data-edit]`).addEventListener("click", () => openEditGoal(goal));
@@ -160,9 +175,68 @@ function bindSavingsEvents() {
 
     const data = { name, targetAmount: target, currentAmount: current, deadline: deadline || null };
     try {
-      if (id) { await updateSavingsGoal(id, data); showToast("Goal updated"); }
-      else    { await addSavingsGoal(data);         showToast("Goal added"); }
+      if (id) {
+        await updateSavingsGoal(id, data);
+        showToast("Goal updated");
+      } else {
+        const ref = await addSavingsGoal(data);
+        if (current > 0) {
+          await addSavingsContribution({
+            goalId: ref.id,
+            goalName: name,
+            amount: current,
+            currentAmount: current,
+            date: new Date(),
+          });
+        }
+        showToast("Goal added");
+      }
       closeModal("modal-saving");
     } catch { showToast("Error saving goal", "error"); }
   });
+}
+
+function calculateForecast(goal) {
+  const current = Number(goal.currentAmount || 0);
+  const target = Number(goal.targetAmount || 0);
+  const remaining = Math.max(0, target - current);
+  if (remaining <= 0) {
+    return { dateLabel: "Complete", status: "Ahead", statusClass: "ahead" };
+  }
+
+  const contributions = _contributions
+    .filter(c => c.goalId === goal.id && Number(c.amount || 0) > 0)
+    .sort((a, b) => toDate(a.date) - toDate(b.date));
+
+  if (!contributions.length) {
+    return { dateLabel: "Add contributions", status: "Behind", statusClass: "behind" };
+  }
+
+  const firstDate = toDate(contributions[0].date);
+  const lastDate = toDate(contributions[contributions.length - 1].date);
+  const positiveTotal = contributions.reduce((s, c) => s + Number(c.amount || 0), 0);
+  const monthSpan = Math.max(1, monthDiff(firstDate, lastDate) + 1);
+  const monthlyRate = positiveTotal / monthSpan;
+  const monthsNeeded = Math.ceil(remaining / monthlyRate);
+  const estimated = new Date();
+  estimated.setMonth(estimated.getMonth() + monthsNeeded);
+
+  const dateLabel = estimated.toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+  const status = goal.deadline ? statusAgainstDeadline(estimated, toDate(goal.deadline)) : "On Track";
+  return { dateLabel, status, statusClass: status.toLowerCase().replace(" ", "-") };
+}
+
+function statusAgainstDeadline(estimated, deadline) {
+  const diffMonths = monthDiff(estimated, deadline);
+  if (diffMonths >= 2) return "Ahead";
+  if (estimated <= deadline) return "On Track";
+  return "Behind";
+}
+
+function monthDiff(a, b) {
+  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+}
+
+function toDate(value) {
+  return value?.toDate ? value.toDate() : new Date(value);
 }
