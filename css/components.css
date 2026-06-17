@@ -200,6 +200,11 @@
   justify-content: space-between;
   gap: 12px;
 }
+.bill-row.overdue {
+  border-color: rgba(231,76,60,.45);
+  background: linear-gradient(180deg, rgba(231,76,60,.10), var(--bg-card));
+  border-left: 3px solid var(--red);
+}
 .bill-name { font-size: 14px; font-weight: 700; }
 .bill-actions {
   display: flex;
@@ -208,6 +213,18 @@
   font-size: 13px;
   font-weight: 800;
   white-space: nowrap;
+}
+.overdue-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .04em;
 }
 .mini-btn {
   background: var(--bg-input);

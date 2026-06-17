@@ -18,6 +18,7 @@ const COL = {
   budgets:        "budgets",
   savingsGoals:   "savingsGoals",
   recurring:      "recurringExpenses",
+  recurringOccurrences: "recurringOccurrences",
   savingsHistory: "savingsContributions",
   notifications:  "notifications",
   profileSettings:"profileSettings",
@@ -236,6 +237,19 @@ export async function deleteRecurringExpense(id) {
 export function listenRecurringExpenses(callback) {
   const q = query(userCol(COL.recurring), orderBy("createdAt", "asc"));
   return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export async function setRecurringOccurrenceStatus(id, data) {
+  return setDoc(userDoc(COL.recurringOccurrences, id), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+export function listenRecurringOccurrences(callback) {
+  return onSnapshot(userCol(COL.recurringOccurrences), snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }

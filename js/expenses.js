@@ -1,14 +1,23 @@
 // ─── Expense Module ───────────────────────────
-import { addExpense, updateExpense, deleteExpense, addRecurringExpense } from "../firebase/db.js";
+import { addExpense, updateExpense, deleteExpense, addRecurringExpense, setRecurringOccurrenceStatus } from "../firebase/db.js";
 import { openModal, closeModal, showToast, confirmDialog } from "./ui.js";
 import { formatDate, formatDateInput, todayISO, evaluateExpression, formatCurrency } from "./utils.js";
 import { getCategories, getPaymentMethods } from "./settings.js";
 
 let editingId = null;
+let pendingRecurringOccurrence = null;
 
 // ── Open "Add Expense" modal ──────────────────
 export function openAddExpense(prefill = {}) {
   editingId = null;
+  pendingRecurringOccurrence = prefill.recurringOccurrenceId ? {
+    id: prefill.recurringOccurrenceId,
+    recurringId: prefill.recurringId || "",
+    recurringName: prefill.recurringName || prefill.note || "",
+    dueDate: prefill.recurringDueDate || prefill.date || todayISO(),
+    amount: Number(prefill.amount || 0),
+    category: prefill.category || "",
+  } : null;
   document.getElementById("modal-expense-title").textContent = "Add Expense";
   document.getElementById("expense-submit-btn").textContent  = "Save Expense";
   document.getElementById("expense-form").reset();
@@ -31,6 +40,7 @@ export function openAddExpense(prefill = {}) {
 // ── Open "Edit Expense" modal ─────────────────
 export function openEditExpense(expense) {
   editingId = expense.id;
+  pendingRecurringOccurrence = null;
   document.getElementById("modal-expense-title").textContent = "Edit Expense";
   document.getElementById("expense-submit-btn").textContent  = "Update Expense";
   document.getElementById("expense-id").value     = expense.id;
@@ -130,7 +140,18 @@ export function initExpenseForm() {
         await updateExpense(editingId, data);
         showToast("Expense updated");
       } else {
-        await addExpense(data);
+        const ref = await addExpense(data);
+        if (pendingRecurringOccurrence) {
+          await setRecurringOccurrenceStatus(pendingRecurringOccurrence.id, {
+            recurringId: pendingRecurringOccurrence.recurringId,
+            recurringName: pendingRecurringOccurrence.recurringName,
+            dueDate: pendingRecurringOccurrence.dueDate,
+            amount: pendingRecurringOccurrence.amount,
+            category: pendingRecurringOccurrence.category,
+            status: "paid",
+            expenseId: ref.id,
+          });
+        }
         if (document.getElementById("expense-recurring")?.checked) {
           const recurringName = document.getElementById("expense-recurring-name").value.trim() || note || category;
           const dueDate = document.getElementById("expense-recurring-due").value || date;
@@ -145,6 +166,7 @@ export function initExpenseForm() {
         }
         showToast("Expense added");
       }
+      pendingRecurringOccurrence = null;
       closeModal("modal-expense");
     } catch (err) {
       console.error(err);
