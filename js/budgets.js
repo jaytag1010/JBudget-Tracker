@@ -79,7 +79,9 @@ function renderMonthlyBudgetPage() {
 
   document.getElementById("budget-total-display").textContent   = formatCurrency(total);
   document.getElementById("budget-total-spent").textContent     = formatCurrency(totalSpent) + " spent";
-  document.getElementById("budget-total-remaining").textContent = formatCurrency(Math.max(0, remaining)) + " left";
+  document.getElementById("budget-total-remaining").textContent = remaining < 0
+    ? formatCurrency(remaining) + " remaining"
+    : formatCurrency(remaining) + " left";
 
   const bar = document.getElementById("budget-overall-bar");
   if (bar) {
@@ -219,7 +221,9 @@ function renderAnnualBudgetPage() {
 
   document.getElementById("budget-total-display").textContent   = formatCurrency(annualTotal);
   document.getElementById("budget-total-spent").textContent     = formatCurrency(totalSpent) + " spent";
-  document.getElementById("budget-total-remaining").textContent = formatCurrency(Math.max(0, remaining)) + " left";
+  document.getElementById("budget-total-remaining").textContent = remaining < 0
+    ? formatCurrency(remaining) + " remaining"
+    : formatCurrency(remaining) + " left";
 
   const bar = document.getElementById("budget-overall-bar");
   if (bar) {
@@ -313,7 +317,10 @@ function syncDashboardBudget(total, spent, remaining) {
   const barEl   = document.getElementById("dash-budget-bar");
   const spentEl = document.getElementById("dash-spent");
 
-  if (remEl)   remEl.textContent   = formatCurrency(Math.max(0, remaining));
+  if (remEl) {
+    remEl.textContent = formatCurrency(remaining);
+    remEl.classList.toggle("negative", remaining < 0);
+  }
   if (totEl)   totEl.textContent   = formatCurrency(total);
   if (spentEl) spentEl.textContent = formatCurrency(spent);
   if (barEl && pctEl) setProgressBar(barEl, pctEl, spent, total);

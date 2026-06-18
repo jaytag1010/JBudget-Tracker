@@ -7,7 +7,7 @@ import {
   collection, doc,
   addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
   query, orderBy, onSnapshot,
-  Timestamp, serverTimestamp,
+  Timestamp, serverTimestamp, writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ── Collection name constants ─────────────────
@@ -95,6 +95,44 @@ export async function addCategory(data) {
 
 export async function updateCategory(id, data) {
   return updateDoc(userDoc(COL.categories, id), data);
+}
+
+export async function renameCategoryAndReferences(id, oldName, data) {
+  const newName = data.name;
+  if (!oldName || oldName === newName) return updateCategory(id, data);
+
+  const [expenseSnap, budgetSnap, recurringSnap, occurrenceSnap] = await Promise.all([
+    getDocs(userCol(COL.expenses)),
+    getDocs(userCol(COL.budgets)),
+    getDocs(userCol(COL.recurring)),
+    getDocs(userCol(COL.recurringOccurrences)),
+  ]);
+
+  const updates = [];
+  expenseSnap.docs.forEach(d => {
+    if (d.data().category === oldName) updates.push([d.ref, { category: newName }]);
+  });
+  recurringSnap.docs.forEach(d => {
+    if (d.data().category === oldName) updates.push([d.ref, { category: newName }]);
+  });
+  occurrenceSnap.docs.forEach(d => {
+    if (d.data().category === oldName) updates.push([d.ref, { category: newName }]);
+  });
+  budgetSnap.docs.forEach(d => {
+    const categories = { ...(d.data().categories || {}) };
+    if (!Object.prototype.hasOwnProperty.call(categories, oldName)) return;
+    const preservedBudget = categories[oldName];
+    delete categories[oldName];
+    categories[newName] = preservedBudget;
+    updates.push([d.ref, { categories }]);
+  });
+  updates.push([userDoc(COL.categories, id), data]);
+
+  for (let i = 0; i < updates.length; i += 450) {
+    const batch = writeBatch(db);
+    updates.slice(i, i + 450).forEach(([ref, payload]) => batch.update(ref, payload));
+    await batch.commit();
+  }
 }
 
 export async function deleteCategory(id) {

@@ -1,6 +1,7 @@
 // ─── Settings Module ─────────────────────────
 import {
   addCategory, updateCategory, deleteCategory, listenCategories, seedDefaultCategories,
+  renameCategoryAndReferences,
   addPaymentMethod, updatePaymentMethod, deletePaymentMethod, listenPaymentMethods,
   seedDefaultPaymentMethods, resetAllData, exportUserData,
   listenProfileSettings, updateProfileSettings,
@@ -18,6 +19,7 @@ let _unsubProfile = null;
 let _pendingPhotoDataUrl = null;
 let _systemThemeMedia = null;
 let _restoreGoogleProfile = false;
+let _editingCategoryOriginalName = "";
 
 export const getCategories     = () => _categories;
 export const getPaymentMethods = () => _paymentMethods;
@@ -115,6 +117,7 @@ function openAddCategory() {
   document.getElementById("modal-category-title").textContent = "Add Category";
   document.getElementById("category-form").reset();
   document.getElementById("category-id").value    = "";
+  _editingCategoryOriginalName = "";
   document.getElementById("category-color").value = CATEGORY_COLORS[7];
   renderColorPicker("color-picker", "category-color");
   openModal("modal-category");
@@ -125,6 +128,7 @@ function openEditCategory(cat) {
   document.getElementById("category-id").value    = cat.id;
   document.getElementById("category-icon").value  = cat.icon;
   document.getElementById("category-name").value  = cat.name;
+  _editingCategoryOriginalName = cat.name;
   document.getElementById("category-color").value = cat.color || CATEGORY_COLORS[7];
   renderColorPicker("color-picker", "category-color");
   openModal("modal-category");
@@ -147,8 +151,16 @@ function bindCategoryForm() {
     const name  = document.getElementById("category-name").value.trim();
     const color = document.getElementById("category-color").value;
     if (!name) { showToast("Enter a category name", "error"); return; }
+    const duplicate = _categories.some(cat =>
+      cat.id !== id && cat.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) { showToast("A category with that name already exists", "error"); return; }
     try {
-      if (id) { await updateCategory(id, { icon, name, color }); showToast("Category updated"); }
+      if (id && _editingCategoryOriginalName !== name) {
+        await renameCategoryAndReferences(id, _editingCategoryOriginalName, { icon, name, color });
+        showToast("Category renamed everywhere");
+      }
+      else if (id) { await updateCategory(id, { icon, name, color }); showToast("Category updated"); }
       else    { await addCategory({ icon, name, color }); showToast("Category added"); }
       closeModal("modal-category");
     } catch { showToast("Error saving category", "error"); }
@@ -223,7 +235,7 @@ function bindSettingsPageEvents() {
     openModal("modal-theme");
   });
   document.getElementById("about-btn")?.addEventListener("click", () => {
-    showToast("SpendWise v2.0 financial planning release", "info");
+    showToast("SpendWise v2.1.1 improvements release", "info");
   });
   document.getElementById("export-data-btn")?.addEventListener("click", handleExportData);
   document.getElementById("edit-profile-btn")?.addEventListener("click", openEditProfile);

@@ -84,6 +84,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.balance-amount.negative {
+  color: var(--red);
+}
 
 .health-card,
 .calendar-panel,
