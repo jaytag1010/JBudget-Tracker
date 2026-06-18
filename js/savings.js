@@ -11,6 +11,8 @@ import { notifyGenerated, notifySystem } from "./notifications.js";
 let _goals = [];
 let _contributions = [];
 
+document.addEventListener("spendwise:notification-settings", syncSavingsNotifications);
+
 // ── Init ──────────────────────────────────────
 export async function initSavings() {
   await seedDefaultSavingsGoal();
@@ -215,6 +217,11 @@ function syncSavingsNotifications() {
       title: `${goal.name} behind target`,
       message: `${formatCurrency(remaining)} remaining. Estimated completion: ${forecast.dateLabel}.`,
       sourceId: goal.id,
+      externalCategory: "savingsGoalUpdates",
+      isRelevant: () => {
+        const latest = _goals.find(item => item.id === goal.id);
+        return Boolean(latest?.deadline && calculateForecast(latest).status === "Behind");
+      },
     });
   });
 }

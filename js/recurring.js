@@ -1,16 +1,22 @@
 import {
   listenRecurringExpenses, addRecurringExpense, updateRecurringExpense, deleteRecurringExpense,
-  listenRecurringOccurrences, setRecurringOccurrenceStatus,
+  listenRecurringOccurrences, skipRecurringOccurrence,
 } from "../firebase/db.js";
 import { openModal, closeModal, showToast, confirmDialog } from "./ui.js";
-import { formatCurrency, formatDateInput, todayISO } from "./utils.js";
+import { formatCurrency, todayISO } from "./utils.js";
+import {
+  dateKey, daysBetween, firstOccurrenceOnOrAfter, nextDueDate, occurrenceId,
+  occurrencesInRange, recurrenceLabel, reminderDays, scheduleFor, validateSchedule,
+} from "./recurrence.js";
 import { getCategories } from "./settings.js";
 import { openAddExpense } from "./expenses.js";
-import { notifyGenerated, notifySystem } from "./notifications.js";
+import { getNotificationSettings, notifyExternal, notifyGenerated, notifySystem } from "./notifications.js";
 
 let _items = [];
 let _occurrenceStatuses = [];
 let _editingId = null;
+let _skipTarget = null;
+const _resolving = new Set();
 
 export function initRecurring() {
   bindRecurringEvents();
@@ -22,6 +28,7 @@ export function initRecurring() {
   });
   listenRecurringOccurrences(items => {
     _occurrenceStatuses = items;
+    renderRecurringPage();
     renderUpcomingBills();
     syncRecurringNotifications();
   });
@@ -35,21 +42,20 @@ export async function createRecurringFromExpense(data) {
   return addRecurringExpense(normalizeRecurring(data));
 }
 
-function normalizeRecurring(data) {
-  return {
-    name: data.name,
-    amount: Number(data.amount),
-    category: data.category,
-    frequency: data.frequency || "monthly",
-    dueDate: data.dueDate,
-    reminderTiming: data.reminderTiming || "same-day",
-    active: data.active !== false,
-  };
-}
-
 function bindRecurringEvents() {
   document.getElementById("add-recurring-btn")?.addEventListener("click", openAddRecurring);
   document.getElementById("recurring-form")?.addEventListener("submit", handleRecurringSubmit);
+  document.getElementById("recurring-frequency")?.addEventListener("change", renderScheduleFields);
+  document.getElementById("skip-occurrence-cancel")?.addEventListener("click", closeSkipModal);
+  document.getElementById("skip-occurrence-confirm")?.addEventListener("click", confirmSkipOccurrence);
+  document.getElementById("modal-skip-occurrence")?.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      if (!_skipTarget?.saving) closeSkipModal();
+    }
+    if (event.key === "Tab") trapSkipFocus(event);
+  });
+  document.addEventListener("spendwise:notification-settings", syncRecurringNotifications);
 }
 
 function openAddRecurring() {
@@ -57,414 +63,393 @@ function openAddRecurring() {
   document.getElementById("modal-recurring-title").textContent = "Add Recurring Expense";
   document.getElementById("recurring-form").reset();
   document.getElementById("recurring-id").value = "";
-  document.getElementById("recurring-due").value = todayISO();
+  document.getElementById("recurring-frequency").value = "monthly";
+  document.getElementById("recurring-day-of-week").value = String(new Date().getDay());
+  document.getElementById("recurring-day-of-month").value = String(new Date().getDate());
+  document.getElementById("recurring-year-month").value = String(new Date().getMonth() + 1);
+  document.getElementById("recurring-year-day").value = String(new Date().getDate());
+  document.getElementById("recurring-reminder").value = "same-day";
+  document.getElementById("recurring-active").checked = true;
   populateRecurringCategories("");
+  renderScheduleFields();
+  setScheduleError("");
   openModal("modal-recurring");
 }
 
 function openEditRecurring(item) {
   _editingId = item.id;
+  const schedule = scheduleFor(item);
   document.getElementById("modal-recurring-title").textContent = "Edit Recurring Expense";
   document.getElementById("recurring-id").value = item.id;
   document.getElementById("recurring-name").value = item.name || "";
   document.getElementById("recurring-amount").value = item.amount || "";
-  document.getElementById("recurring-frequency").value = item.frequency || "monthly";
-  document.getElementById("recurring-due").value = formatDateInput(item.dueDate);
+  document.getElementById("recurring-frequency").value = schedule.frequency;
+  document.getElementById("recurring-day-of-week").value = String(schedule.dayOfWeek ?? 1);
+  document.getElementById("recurring-day-of-month").value = String(schedule.dayOfMonth ?? 1);
+  document.getElementById("recurring-year-month").value = String(schedule.month ?? 1);
+  document.getElementById("recurring-year-day").value = String(schedule.dayOfMonth ?? 1);
   document.getElementById("recurring-reminder").value = item.reminderTiming || "same-day";
   document.getElementById("recurring-active").checked = item.active !== false;
   populateRecurringCategories(item.category || "");
+  renderScheduleFields();
+  setScheduleError("");
   openModal("modal-recurring");
 }
 
 function populateRecurringCategories(selected) {
-  const sel = document.getElementById("recurring-category");
-  if (!sel) return;
-  sel.innerHTML = '<option value="">Choose category...</option>';
-  getCategories().forEach(cat => {
-    const opt = document.createElement("option");
-    opt.value = cat.name;
-    opt.textContent = `${cat.icon} ${cat.name}`;
-    opt.selected = cat.name === selected;
-    sel.appendChild(opt);
+  const select = document.getElementById("recurring-category");
+  if (!select) return;
+  select.innerHTML = '<option value="">Choose category...</option>';
+  getCategories().forEach(category => {
+    const option = document.createElement("option");
+    option.value = category.name;
+    option.textContent = `${category.icon} ${category.name}`;
+    option.selected = category.name === selected;
+    select.appendChild(option);
   });
 }
 
-async function handleRecurringSubmit(e) {
-  e.preventDefault();
-  const data = {
+function scheduleFromForm() {
+  const frequency = document.getElementById("recurring-frequency").value;
+  if (frequency === "weekly") {
+    return { frequency, dayOfWeek: Number(document.getElementById("recurring-day-of-week").value) };
+  }
+  if (frequency === "yearly") {
+    return {
+      frequency,
+      month: Number(document.getElementById("recurring-year-month").value),
+      dayOfMonth: Number(document.getElementById("recurring-year-day").value),
+    };
+  }
+  return { frequency: "monthly", dayOfMonth: Number(document.getElementById("recurring-day-of-month").value) };
+}
+
+function renderScheduleFields() {
+  const frequency = document.getElementById("recurring-frequency")?.value || "monthly";
+  document.getElementById("recurring-weekly-fields")?.classList.toggle("hidden", frequency !== "weekly");
+  document.getElementById("recurring-monthly-fields")?.classList.toggle("hidden", frequency !== "monthly");
+  document.getElementById("recurring-yearly-fields")?.classList.toggle("hidden", frequency !== "yearly");
+}
+
+async function handleRecurringSubmit(event) {
+  event.preventDefault();
+  const schedule = scheduleFromForm();
+  const scheduleError = validateSchedule(schedule);
+  setScheduleError(scheduleError);
+  if (scheduleError) return;
+
+  const existing = _items.find(item => item.id === _editingId);
+  const ruleChanged = existing && JSON.stringify(scheduleFor(existing)) !== JSON.stringify(schedule);
+  const anchor = firstOccurrenceOnOrAfter({ ...schedule, dueDate: todayISO() }, new Date());
+  const data = normalizeRecurring({
     name: document.getElementById("recurring-name").value.trim(),
     amount: parseFloat(document.getElementById("recurring-amount").value),
     category: document.getElementById("recurring-category").value,
-    frequency: document.getElementById("recurring-frequency").value,
-    dueDate: document.getElementById("recurring-due").value,
+    ...schedule,
+    dueDate: ruleChanged || !existing ? dateKey(anchor) : dateKey(existing.dueDate),
+    scheduleEffectiveDate: ruleChanged ? todayISO() : existing?.scheduleEffectiveDate || null,
     reminderTiming: document.getElementById("recurring-reminder").value,
     active: document.getElementById("recurring-active").checked,
-  };
+  });
 
   if (!data.name) return showToast("Enter a recurring name", "error");
   if (!data.amount || data.amount <= 0) return showToast("Enter a valid amount", "error");
   if (!data.category) return showToast("Choose a category", "error");
-  if (!data.dueDate) return showToast("Choose a due date", "error");
 
+  const submit = document.getElementById("recurring-submit-btn");
+  submit.disabled = true;
+  submit.textContent = "Saving...";
   try {
     if (_editingId) {
-      await updateRecurringExpense(_editingId, normalizeRecurring(data));
-      notifySystem("Recurring expense updated", `${data.name} was updated.`);
+      await updateRecurringExpense(_editingId, data);
+      await notifySystem("Recurring expense updated", `${data.name} was updated.`);
       showToast("Recurring expense updated");
     } else {
-      await addRecurringExpense(normalizeRecurring(data));
-      notifySystem("Recurring expense added", `${data.name} reminders are active.`);
+      await addRecurringExpense(data);
+      await notifySystem("Recurring expense added", `${data.name} reminders are active.`);
       showToast("Recurring expense added");
     }
     closeModal("modal-recurring");
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error(error);
     showToast("Error saving recurring expense", "error");
+  } finally {
+    submit.disabled = false;
+    submit.textContent = "Save Recurring Expense";
   }
 }
 
+function normalizeRecurring(data) {
+  const schedule = scheduleFor(data);
+  const normalized = {
+    name: data.name,
+    amount: Number(data.amount),
+    category: data.category,
+    frequency: schedule.frequency,
+    dueDate: data.dueDate,
+    reminderTiming: data.reminderTiming || "same-day",
+    active: data.active !== false,
+  };
+  if (schedule.frequency === "weekly") normalized.dayOfWeek = schedule.dayOfWeek;
+  if (schedule.frequency === "monthly") normalized.dayOfMonth = schedule.dayOfMonth;
+  if (schedule.frequency === "yearly") {
+    normalized.month = schedule.month;
+    normalized.dayOfMonth = schedule.dayOfMonth;
+  }
+  if (data.scheduleEffectiveDate) normalized.scheduleEffectiveDate = data.scheduleEffectiveDate;
+  return normalized;
+}
+
+function setScheduleError(message) {
+  const element = document.getElementById("recurring-schedule-error");
+  if (!element) return;
+  element.textContent = message;
+  element.classList.toggle("hidden", !message);
+}
+
 function renderRecurringPage() {
-  const el = document.getElementById("recurring-list");
-  if (!el) return;
+  const list = document.getElementById("recurring-list");
+  if (!list) return;
   if (!_items.length) {
-    el.innerHTML = '<p class="empty-msg">No recurring expenses yet.</p>';
+    list.innerHTML = '<p class="empty-msg">No recurring expenses yet.</p>';
     return;
   }
-
-  el.innerHTML = "";
+  list.innerHTML = "";
   _items.forEach(item => {
     const card = document.createElement("div");
     card.className = "recurring-card";
-    const next = nextDueDate(item);
+    const payable = nextPayableOccurrence(item);
     card.innerHTML = `
       <div class="recurring-main">
         <div class="recurring-check">${item.active === false ? "○" : "☑"}</div>
         <div class="recurring-info">
           <div class="recurring-name">${item.name}</div>
-          <div class="recurring-meta">${titleCase(item.frequency)} · ${duePhrase(item)}</div>
+          <div class="recurring-meta">${recurrenceLabel(item)}</div>
         </div>
         <div class="recurring-amount">${formatCurrency(item.amount)}</div>
       </div>
       <div class="recurring-footer">
-        <span>Next due: ${formatShortDate(next)}</span>
+        <span>${payable ? `Next unresolved: ${formatShortDate(payable.due)}` : "No unresolved occurrence"}</span>
         <div>
-          <button class="mini-btn" data-pay="${item.id}">Pay</button>
-          <button class="mini-btn" data-toggle="${item.id}">${item.active === false ? "Enable" : "Disable"}</button>
-          <button class="mini-btn" data-edit="${item.id}">Edit</button>
-          <button class="mini-btn danger" data-del="${item.id}">Remove</button>
+          <button class="mini-btn" data-pay ${payable && item.active !== false ? "" : "disabled"}>Pay</button>
+          <button class="mini-btn" data-toggle>${item.active === false ? "Enable" : "Disable"}</button>
+          <button class="mini-btn" data-edit>Edit</button>
+          <button class="mini-btn danger" data-del>Remove</button>
         </div>
       </div>`;
-    card.querySelector("[data-pay]").addEventListener("click", () => payRecurring(item));
+    card.querySelector("[data-pay]").addEventListener("click", () => payable && payOccurrence(payable));
     card.querySelector("[data-toggle]").addEventListener("click", () => toggleRecurring(item));
     card.querySelector("[data-edit]").addEventListener("click", () => openEditRecurring(item));
     card.querySelector("[data-del]").addEventListener("click", () => removeRecurring(item));
-    el.appendChild(card);
+    list.appendChild(card);
   });
 }
 
 async function toggleRecurring(item) {
   try {
-    await updateRecurringExpense(item.id, {
-      name: item.name,
-      amount: item.amount,
-      category: item.category,
-      frequency: item.frequency,
-      dueDate: formatDateInput(item.dueDate),
-      reminderTiming: item.reminderTiming,
-      active: item.active === false,
-    });
-    notifySystem("Recurring expense updated", `${item.name} is now ${item.active === false ? "active" : "disabled"}.`);
+    await updateRecurringExpense(item.id, { ...normalizeRecurring({ ...item, dueDate: dateKey(item.dueDate) }), active: item.active === false });
+    await notifySystem("Recurring expense updated", `${item.name} is now ${item.active === false ? "active" : "disabled"}.`);
   } catch {
     showToast("Error updating recurring expense", "error");
   }
 }
 
 function renderUpcomingBills() {
-  const el = document.getElementById("upcoming-bills-list");
-  if (!el) return;
+  const list = document.getElementById("upcoming-bills-list");
+  if (!list) return;
   const occurrences = buildVisibleOccurrences();
-
   if (!occurrences.length) {
-    el.innerHTML = '<p class="empty-msg compact">No unresolved bills this month.</p>';
+    list.innerHTML = '<p class="empty-msg compact">No unresolved bills this month.</p>';
     return;
   }
-
-  el.innerHTML = "";
-  occurrences.forEach(occ => {
+  list.innerHTML = "";
+  occurrences.forEach(occurrence => {
     const row = document.createElement("div");
-    row.className = "bill-row" + (occ.overdue ? " overdue" : "");
+    row.className = `bill-row${occurrence.overdue ? " overdue" : ""}`;
     row.innerHTML = `
       <div>
-        <div class="bill-name">${occ.item.name}</div>
-        <div class="bill-date">Due: ${formatShortDate(occ.due)}</div>
-        ${occ.overdue ? `<div class="overdue-badge">OVERDUE by ${occ.daysOverdue} day${occ.daysOverdue === 1 ? "" : "s"}</div>` : ""}
+        <div class="bill-name">${occurrence.item.name}</div>
+        <div class="bill-date">Due: ${formatShortDate(occurrence.due)} · ${recurrenceLabel(occurrence.item)}</div>
+        ${occurrence.overdue ? `<div class="overdue-badge">OVERDUE by ${occurrence.daysOverdue} day${occurrence.daysOverdue === 1 ? "" : "s"}</div>` : ""}
       </div>
       <div class="bill-actions">
-        <span>${formatCurrency(occ.item.amount)}</span>
-        <button class="mini-btn" data-skip="${occ.id}">Skip</button>
-        <button class="mini-btn" data-pay="${occ.id}">Pay</button>
+        <span>${formatCurrency(occurrence.item.amount)}</span>
+        <button class="mini-btn" data-skip>Skip</button>
+        <button class="mini-btn" data-pay>Pay</button>
       </div>`;
-    row.querySelector("[data-skip]").addEventListener("click", () => skipOccurrence(occ));
-    row.querySelector("[data-pay]").addEventListener("click", () => payOccurrence(occ));
-    el.appendChild(row);
-  });
-}
-
-function syncRecurringNotifications() {
-  syncOccurrenceNotifications();
-  return;
-  _items
-    .filter(item => item.active !== false)
-    .forEach(item => {
-      const due = nextDueDate(item);
-      const days = daysBetween(new Date(), due);
-      if (days < 0 || days > reminderDays(item.reminderTiming)) return;
-      const when = days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
-      notifyGenerated(`recurring-${item.id}-${due.toISOString().split("T")[0]}`, {
-        type: "recurring",
-        icon: "📅",
-        severity: days <= 1 ? "warn" : "info",
-        title: `${item.name} bill due ${when}`,
-        message: `${formatCurrency(item.amount)} due on ${formatShortDate(due)}.`,
-        sourceId: item.id,
-      });
-    });
-}
-
-function syncOccurrenceNotifications() {
-  buildVisibleOccurrences().forEach(occ => {
-    const days = daysBetween(new Date(), occ.due);
-    if (!occ.overdue && (days < 0 || days > reminderDays(occ.item.reminderTiming))) return;
-    const when = occ.overdue
-      ? `overdue by ${occ.daysOverdue} day${occ.daysOverdue === 1 ? "" : "s"}`
-      : days === 0 ? "due today" : days === 1 ? "due tomorrow" : `due in ${days} days`;
-    notifyGenerated(`recurring-${occ.id}`, {
-      type: "recurring",
-      icon: occ.overdue ? "🔴" : "📅",
-      severity: occ.overdue ? "danger" : days <= 1 ? "warn" : "info",
-      title: `${occ.item.name} ${when}`,
-      message: `${formatCurrency(occ.item.amount)} due on ${formatShortDate(occ.due)}.`,
-      sourceId: occ.id,
-    });
+    row.querySelector("[data-skip]").addEventListener("click", () => openSkipModal(occurrence));
+    row.querySelector("[data-pay]").addEventListener("click", event => payOccurrence(occurrence, event.currentTarget));
+    list.appendChild(row);
   });
 }
 
 function buildVisibleOccurrences(now = new Date()) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  const statusMap = new Map(_occurrenceStatuses.map(s => [s.id, s]));
-
-  return _items
-    .filter(item => item.active !== false)
-    .flatMap(item => buildOccurrencesForTemplate(item, monthStart, monthEnd, today, statusMap))
-    .filter(occ => occ.status === "pending")
-    .filter(occ => occ.due <= today || isSameMonth(occ.due, today))
+  const start = new Date(today.getFullYear(), today.getMonth() - 12, 1);
+  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  return _items.filter(item => item.active !== false)
+    .flatMap(item => buildOccurrences(item, start, end, today))
+    .filter(occurrence => occurrence.status === "pending")
+    .filter(occurrence => occurrence.due <= today || sameMonth(occurrence.due, today))
     .sort((a, b) => a.due - b.due || a.item.name.localeCompare(b.item.name));
 }
 
-function buildOccurrencesForTemplate(item, monthStart, monthEnd, today, statusMap) {
-  const base = normalizeDate(item.dueDate);
-  const start = new Date(Math.max(base.getTime(), new Date(today.getFullYear(), today.getMonth() - 12, 1).getTime()));
-  const end = monthEnd;
-  const dates = [];
-  let cursor = firstOccurrenceOnOrAfter(item, start);
-
-  while (cursor <= end) {
-    dates.push(new Date(cursor));
-    cursor = nextOccurrenceDate(item, cursor);
-  }
-
-  return dates.map(due => {
+function buildOccurrences(item, start, end, today = new Date()) {
+  const statusMap = new Map(_occurrenceStatuses.map(status => [status.id, status]));
+  return occurrencesInRange(item, start, end).map(due => {
     const id = occurrenceId(item.id, due);
-    const stored = statusMap.get(id);
-    const status = stored?.status || "pending";
-    const daysOverdue = Math.max(0, daysBetween(due, today));
+    const status = statusMap.get(id)?.status || "pending";
     return {
-      id,
-      item,
-      due,
-      dueKey: dateKey(due),
-      status,
+      id, item, due, dueKey: dateKey(due), status,
       overdue: status === "pending" && due < today,
-      daysOverdue,
+      daysOverdue: Math.max(0, daysBetween(due, today)),
     };
   });
 }
 
-function firstOccurrenceOnOrAfter(item, start) {
-  const base = normalizeDate(item.dueDate);
-  let cursor = new Date(base);
-  if (item.frequency === "yearly") {
-    cursor = new Date(start.getFullYear(), base.getMonth(), base.getDate());
-    if (cursor < start) cursor = new Date(start.getFullYear() + 1, base.getMonth(), base.getDate());
-    return cursor;
-  }
-  if (item.frequency === "weekly") {
-    while (cursor < start) cursor.setDate(cursor.getDate() + 7);
-    return cursor;
-  }
-  cursor = new Date(start.getFullYear(), start.getMonth(), Math.min(base.getDate(), daysInMonth(start)));
-  if (cursor < start) {
-    const nextMonth = new Date(start.getFullYear(), start.getMonth() + 1, 1);
-    cursor = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(base.getDate(), daysInMonth(nextMonth)));
-  }
-  return cursor;
+function nextPayableOccurrence(item, now = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+  const end = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate());
+  return buildOccurrences(item, start, end, new Date(now.getFullYear(), now.getMonth(), now.getDate()))
+    .find(occurrence => occurrence.status === "pending");
 }
 
-function nextOccurrenceDate(item, date) {
-  const base = normalizeDate(item.dueDate);
-  const next = new Date(date);
-  if (item.frequency === "weekly") {
-    next.setDate(next.getDate() + 7);
-    return next;
-  }
-  if (item.frequency === "yearly") {
-    return new Date(next.getFullYear() + 1, base.getMonth(), base.getDate());
-  }
-  const nextMonth = new Date(next.getFullYear(), next.getMonth() + 1, 1);
-  return new Date(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(base.getDate(), daysInMonth(nextMonth)));
-}
-
-async function skipOccurrence(occ) {
-  const ok = await confirmDialog("Skip Bill", `Skip ${occ.item.name} due ${formatShortDate(occ.due)}?`, "Skip");
-  if (!ok) return;
-  try {
-    await setRecurringOccurrenceStatus(occ.id, occurrencePayload(occ, "skipped"));
-    notifySystem("Recurring bill skipped", `${occ.item.name} due ${formatShortDate(occ.due)} was skipped.`);
-    showToast("Bill skipped", "info");
-  } catch {
-    showToast("Could not skip bill", "error");
-  }
-}
-
-function payOccurrence(occ) {
-  openAddExpense({
-    amount: occ.item.amount,
-    category: occ.item.category,
-    note: occ.item.name,
-    date: occ.dueKey,
-    recurringId: occ.item.id,
-    recurringOccurrenceId: occ.id,
-    recurringDueDate: occ.dueKey,
-    recurringName: occ.item.name,
+function syncRecurringNotifications() {
+  buildVisibleOccurrences().forEach(occurrence => {
+    const days = daysBetween(new Date(), occurrence.due);
+    const inAppDue = occurrence.overdue || (days >= 0 && days <= reminderDays(occurrence.item.reminderTiming));
+    const pushSettings = getNotificationSettings();
+    const externalDue = occurrence.overdue || days === pushSettings.recurringBillReminders.daysBefore;
+    if (!inAppDue && !externalDue) return;
+    const when = occurrence.overdue
+      ? `overdue by ${occurrence.daysOverdue} day${occurrence.daysOverdue === 1 ? "" : "s"}`
+      : days === 0 ? "due today" : days === 1 ? "due tomorrow" : `due in ${days} days`;
+    const payload = {
+      type: "recurring",
+      icon: occurrence.overdue ? "🔴" : "📅",
+      severity: occurrence.overdue ? "danger" : days <= 1 ? "warn" : "info",
+      title: `${occurrence.item.name} ${when}`,
+      message: `${formatCurrency(occurrence.item.amount)} due on ${formatShortDate(occurrence.due)}.`,
+      sourceId: occurrence.id,
+      externalCategory: occurrence.overdue ? "overdueBillAlerts" : "recurringBillReminders",
+      daysUntilDue: days,
+      daysOverdue: occurrence.daysOverdue,
+      isRelevant: () => !_occurrenceStatuses.some(status => status.id === occurrence.id && status.status !== "pending"),
+    };
+    if (inAppDue) notifyGenerated(`recurring-${occurrence.id}`, { ...payload, externalCategory: null });
+    if (externalDue) notifyExternal(`recurring-${occurrence.id}`, payload);
   });
 }
 
-function occurrencePayload(occ, status, extra = {}) {
+function openSkipModal(occurrence) {
+  if (_resolving.has(occurrence.id)) return;
+  _skipTarget = { occurrence, saving: false, returnFocus: document.activeElement };
+  document.getElementById("skip-occurrence-name").textContent = `${occurrence.item.name} due ${formatShortDate(occurrence.due)}`;
+  document.getElementById("skip-occurrence-error").classList.add("hidden");
+  openModal("modal-skip-occurrence");
+  document.getElementById("skip-occurrence-cancel").focus();
+}
+
+function closeSkipModal() {
+  if (_skipTarget?.saving) return;
+  const returnFocus = _skipTarget?.returnFocus;
+  closeModal("modal-skip-occurrence");
+  _skipTarget = null;
+  if (returnFocus?.isConnected) returnFocus.focus();
+}
+
+function trapSkipFocus(event) {
+  const modal = document.getElementById("modal-skip-occurrence");
+  const focusable = [...modal.querySelectorAll("button:not([disabled])")];
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+async function confirmSkipOccurrence() {
+  const target = _skipTarget;
+  if (!target || target.saving || _resolving.has(target.occurrence.id)) return;
+  target.saving = true;
+  _resolving.add(target.occurrence.id);
+  const button = document.getElementById("skip-occurrence-confirm");
+  button.disabled = true;
+  button.textContent = "Skipping...";
+  try {
+    await skipRecurringOccurrence(target.occurrence.id, occurrencePayload(target.occurrence));
+    closeModal("modal-skip-occurrence");
+    _skipTarget = null;
+    if (target.returnFocus?.isConnected) target.returnFocus.focus();
+    showToast("Bill occurrence skipped", "info");
+  } catch (error) {
+    const message = error?.code === "occurrence-already-paid" ? "A paid occurrence cannot be skipped."
+      : error?.code === "occurrence-already-skipped" ? "This occurrence is already skipped."
+        : "Could not skip this occurrence. Try again.";
+    const errorElement = document.getElementById("skip-occurrence-error");
+    errorElement.textContent = message;
+    errorElement.classList.remove("hidden");
+    target.saving = false;
+  } finally {
+    _resolving.delete(target.occurrence.id);
+    button.disabled = false;
+    button.textContent = "Skip Occurrence";
+  }
+}
+
+function payOccurrence(occurrence, button = null) {
+  if (_resolving.has(occurrence.id)) return;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Opening...";
+    setTimeout(() => { button.disabled = false; button.textContent = "Pay"; }, 500);
+  }
+  openAddExpense({
+    amount: occurrence.item.amount,
+    category: occurrence.item.category,
+    note: occurrence.item.name,
+    date: occurrence.dueKey,
+    recurringId: occurrence.item.id,
+    recurringOccurrenceId: occurrence.id,
+    recurringDueDate: occurrence.dueKey,
+    recurringName: occurrence.item.name,
+  });
+}
+
+function occurrencePayload(occurrence) {
   return {
-    recurringId: occ.item.id,
-    recurringName: occ.item.name,
-    dueDate: occ.dueKey,
-    amount: Number(occ.item.amount || 0),
-    category: occ.item.category || "",
-    status,
-    ...extra,
+    recurringId: occurrence.item.id,
+    recurringName: occurrence.item.name,
+    occurrenceDate: occurrence.dueKey,
+    dueDate: occurrence.dueKey,
+    amount: Number(occurrence.item.amount || 0),
+    category: occurrence.item.category || "",
   };
 }
 
-function payRecurring(item, due = nextDueDate(item)) {
-  payOccurrence({
-    id: occurrenceId(item.id, due),
-    item,
-    due,
-    dueKey: dateKey(due),
-  });
-}
-
 async function removeRecurring(item) {
-  const ok = await confirmDialog("Remove Recurring Expense", `Remove "${item.name}"?`);
-  if (!ok) return;
+  const confirmed = await confirmDialog("Remove Recurring Expense", `Remove "${item.name}"?`);
+  if (!confirmed) return;
   try {
     await deleteRecurringExpense(item.id);
-    notifySystem("Recurring expense removed", `${item.name} was removed.`);
+    await notifySystem("Recurring expense removed", `${item.name} was removed.`);
     showToast("Recurring expense removed", "info");
   } catch {
     showToast("Error removing recurring expense", "error");
   }
 }
 
-export function nextDueDate(item, from = new Date()) {
-  const base = item.dueDate?.toDate ? item.dueDate.toDate() : new Date(item.dueDate);
-  const today = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  let due = new Date(base.getFullYear(), base.getMonth(), base.getDate());
-
-  if ((item.frequency || "monthly") === "weekly") {
-    while (due < today) due.setDate(due.getDate() + 7);
-    return due;
-  }
-  if (item.frequency === "yearly") {
-    due = new Date(today.getFullYear(), base.getMonth(), base.getDate());
-    if (due < today) due = new Date(today.getFullYear() + 1, base.getMonth(), base.getDate());
-    return due;
-  }
-
-  due = new Date(today.getFullYear(), today.getMonth(), Math.min(base.getDate(), daysInMonth(today)));
-  if (due < today) {
-    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    due = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(base.getDate(), daysInMonth(nextMonth)));
-  }
-  return due;
-}
-
-function daysInMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-}
-
-function normalizeDate(value) {
-  const d = value?.toDate ? value.toDate() : new Date(value);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function dateKey(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function occurrenceId(recurringId, due) {
-  return `${recurringId}_${dateKey(due)}`;
-}
-
-function isSameMonth(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
-}
-
-function daysBetween(a, b) {
-  const one = new Date(a.getFullYear(), a.getMonth(), a.getDate());
-  const two = new Date(b.getFullYear(), b.getMonth(), b.getDate());
-  return Math.round((two - one) / 86400000);
-}
-
-function reminderDays(value) {
-  if (value === "1-day") return 1;
-  if (value === "3-days") return 3;
-  if (value === "7-days") return 7;
-  return 0;
-}
-
-function duePhrase(item) {
-  const due = item.dueDate?.toDate ? item.dueDate.toDate() : new Date(item.dueDate);
-  if (item.frequency === "weekly") {
-    return `Every ${due.toLocaleDateString("en-PH", { weekday: "long" })}`;
-  }
-  if (item.frequency === "yearly") {
-    return `Every ${due.toLocaleDateString("en-PH", { month: "short", day: "numeric" })}`;
-  }
-  return `Every ${ordinal(due.getDate())}`;
-}
-
-function ordinal(n) {
-  const v = n % 100;
-  if (v >= 11 && v <= 13) return `${n}th`;
-  return `${n}${["th", "st", "nd", "rd"][Math.min(n % 10, 4)] || "th"}`;
+function sameMonth(first, second) {
+  return first.getFullYear() === second.getFullYear() && first.getMonth() === second.getMonth();
 }
 
 function formatShortDate(date) {
   return date.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function titleCase(value) {
-  return String(value || "").replace(/^\w/, c => c.toUpperCase());
-}
+export { nextDueDate } from "./recurrence.js";

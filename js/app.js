@@ -200,6 +200,7 @@ function bindNavigation() {
 
   document.getElementById("nav-add-btn")?.addEventListener("click", openAddExpense);
   document.getElementById("notification-btn")?.addEventListener("click", () => navigateTo("notifications"));
+  document.getElementById("budget-settings-btn")?.addEventListener("click", () => navigateTo("settings"));
   document.getElementById("profile-btn")?.addEventListener("click", () => navigateTo("profile"));
   document.getElementById("settings-back-btn")?.addEventListener("click", () => navigateTo("dashboard"));
 

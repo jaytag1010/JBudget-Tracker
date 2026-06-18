@@ -82,6 +82,15 @@ input, select, button, textarea {
 }
 
 button { cursor: pointer; border: none; background: none; }
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+button:disabled,
+input:disabled,
+select:disabled { cursor: not-allowed; opacity: .55; }
 a { color: inherit; text-decoration: none; }
 img { display: block; max-width: 100%; }
 ul { list-style: none; }
@@ -284,8 +293,10 @@ ul { list-style: none; }
   line-height: 1.25;
 }
 @media (max-width: 380px) {
-  .greeting-title { max-width: 210px; font-size: 16px; }
-  .greeting-subtitle { max-width: 210px; }
+  .greeting-title { max-width: 175px; font-size: 15px; }
+  .greeting-subtitle { max-width: 175px; font-size: 11px; }
+  #page-dashboard .page-header { gap: 6px; padding-inline: 12px; }
+  #page-dashboard .header-actions { gap: 2px; }
 }
 .header-badge {
   font-size: 14px;

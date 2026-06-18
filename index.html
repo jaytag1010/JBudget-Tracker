@@ -100,11 +100,14 @@
           <p class="header-greeting greeting-subtitle" id="greeting-subtitle">Keep your spending on track.</p>
         </div>
         <div class="header-actions">
-          <button class="icon-btn badge-icon-btn" id="notification-btn" aria-label="Notifications">
+          <button class="icon-btn" id="budget-settings-btn" aria-label="Open Budget Settings" title="Budget Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2" fill="var(--bg-primary)"/><circle cx="15" cy="12" r="2" fill="var(--bg-primary)"/><circle cx="7" cy="18" r="2" fill="var(--bg-primary)"/></svg>
+          </button>
+          <button class="icon-btn badge-icon-btn" id="notification-btn" aria-label="Open Notifications">
             <span class="header-symbol">🔔</span>
             <span id="notification-badge" class="notification-badge hidden">0</span>
           </button>
-          <button class="icon-btn" id="profile-btn" aria-label="Profile">
+          <button class="icon-btn" id="profile-btn" aria-label="Open Profile">
             <span class="header-symbol">👤</span>
           </button>
         </div>
@@ -281,6 +284,94 @@
       </div>
     </section>
 
+    <!-- NOTIFICATION SETTINGS -->
+    <section id="page-notification-settings" class="page">
+      <header class="page-header">
+        <button class="icon-btn" data-nav="profile" aria-label="Back to Profile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="header-title">Notification Settings</h2>
+        <div style="width:40px"></div>
+      </header>
+      <div class="page-content notification-settings-page">
+        <div class="settings-section notification-master-card">
+          <label class="settings-toggle-row" for="push-enabled">
+            <span><strong>Enable Push Notifications</strong><small>Controls external browser notifications only.</small></span>
+            <input type="checkbox" id="push-enabled" aria-describedby="notification-permission-status">
+          </label>
+          <div class="permission-panel">
+            <strong id="notification-permission-status">Permission Not Requested</strong>
+            <p id="notification-permission-help">In-app notifications remain available regardless of this setting.</p>
+            <button type="button" class="btn btn-primary" id="notification-permission-btn">Enable Notifications</button>
+          </div>
+        </div>
+
+        <fieldset class="settings-section push-dependent" id="push-category-settings">
+          <legend>Notification Categories</legend>
+          <label class="settings-toggle-row" for="notify-recurring-enabled">
+            <span><strong>Recurring Bill Reminders</strong><small>Reminders before unresolved bills are due.</small></span>
+            <input type="checkbox" id="notify-recurring-enabled">
+          </label>
+          <div class="choice-group" role="radiogroup" aria-label="Recurring bill reminder timing">
+            <label><input type="radio" name="recurring-reminder-days" value="0"> Same Day</label>
+            <label><input type="radio" name="recurring-reminder-days" value="1"> 1 Day Before</label>
+            <label><input type="radio" name="recurring-reminder-days" value="3"> 3 Days Before</label>
+            <label><input type="radio" name="recurring-reminder-days" value="7"> 7 Days Before</label>
+          </div>
+
+          <label class="settings-toggle-row" for="notify-overdue-enabled">
+            <span><strong>Overdue Bill Alerts</strong><small>Alerts for unresolved overdue occurrences.</small></span>
+            <input type="checkbox" id="notify-overdue-enabled">
+          </label>
+          <label class="form-label" for="notify-overdue-frequency">Alert Frequency</label>
+          <select id="notify-overdue-frequency" class="form-input">
+            <option value="daily">Daily</option>
+            <option value="every_3_days">Every 3 Days</option>
+            <option value="weekly">Weekly</option>
+          </select>
+
+          <label class="settings-toggle-row" for="notify-budget-enabled">
+            <span><strong>Budget Alerts</strong><small>Notify once as each selected threshold is reached.</small></span>
+            <input type="checkbox" id="notify-budget-enabled">
+          </label>
+          <div class="choice-group" aria-label="Budget alert thresholds">
+            <label><input type="checkbox" name="budget-threshold" value="80"> 80%</label>
+            <label><input type="checkbox" name="budget-threshold" value="90"> 90%</label>
+            <label><input type="checkbox" name="budget-threshold" value="95"> 95%</label>
+            <label><input type="checkbox" name="budget-threshold" value="100"> 100%</label>
+          </div>
+
+          <label class="settings-toggle-row" for="notify-savings-enabled">
+            <span><strong>Savings Goal Updates</strong><small>Uses existing savings target forecasts.</small></span>
+            <input type="checkbox" id="notify-savings-enabled">
+          </label>
+          <label class="settings-toggle-row" for="notify-monthly-enabled">
+            <span><strong>Monthly Summary Notifications</strong><small>Preference stored; background scheduling requires server support.</small></span>
+            <input type="checkbox" id="notify-monthly-enabled">
+          </label>
+        </fieldset>
+
+        <fieldset class="settings-section push-dependent" id="quiet-hours-settings">
+          <legend>Quiet Hours</legend>
+          <label class="settings-toggle-row" for="quiet-hours-enabled">
+            <span><strong>Quiet Hours</strong><small>Suppresses external notifications, never the in-app center.</small></span>
+            <input type="checkbox" id="quiet-hours-enabled">
+          </label>
+          <div class="time-fields">
+            <label class="form-label" for="quiet-hours-start">Start Time
+              <input type="time" id="quiet-hours-start" class="form-input" value="22:00">
+            </label>
+            <label class="form-label" for="quiet-hours-end">End Time
+              <input type="time" id="quiet-hours-end" class="form-input" value="07:00">
+            </label>
+          </div>
+          <p class="form-error hidden" id="quiet-hours-error" role="alert"></p>
+          <p class="settings-note" id="quiet-hours-timezone"></p>
+        </fieldset>
+        <p class="settings-save-status" id="notification-settings-status" aria-live="polite"></p>
+      </div>
+    </section>
+
     <!-- RECURRING -->
     <section id="page-recurring" class="page">
       <header class="page-header">
@@ -339,11 +430,12 @@
           </div>
         </div>
         <div class="profile-menu">
-          <button class="profile-menu-item" data-nav="settings"><span>Settings</span><strong>›</strong></button>
-          <button class="profile-menu-item" data-nav="notifications"><span>Notifications</span><strong>›</strong></button>
+          <button class="profile-menu-item" data-nav="settings"><span>Budget Settings</span><strong>›</strong></button>
+          <button class="profile-menu-item" data-nav="notification-settings"><span>Notification Settings</span><strong>›</strong></button>
+          <button class="profile-menu-item" data-nav="notifications"><span>Notification Center</span><strong>›</strong></button>
           <button class="profile-menu-item" id="profile-theme-btn"><span>Theme</span><strong id="theme-current-label">Dark</strong></button>
           <button class="profile-menu-item" id="export-data-btn"><span>Export Data</span><strong>›</strong></button>
-          <button class="profile-menu-item" id="about-btn"><span>About</span><strong>v2.1.1</strong></button>
+          <button class="profile-menu-item" id="about-btn"><span>About</span><strong>v2.2.0</strong></button>
           <button class="profile-menu-item danger" id="profile-logout-btn"><span>Logout</span><strong>›</strong></button>
         </div>
       </div>
@@ -447,7 +539,7 @@
         <button class="icon-btn" id="settings-back-btn" aria-label="Back">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <h2 class="header-title">Settings</h2>
+        <h2 class="header-title">Budget Settings</h2>
         <div style="width:40px"></div>
       </header>
 
@@ -491,7 +583,7 @@
           <button class="btn btn-danger full-width" id="reset-data-btn">Reset All Data</button>
         </div>
 
-        <div class="app-version">SpendWise v2.1.1 · Powered by Firebase</div>
+        <div class="app-version">SpendWise v2.2.0 · Powered by Firebase</div>
       </div>
     </section>
 
@@ -809,8 +901,32 @@
           <option value="monthly" selected>Monthly</option>
           <option value="yearly">Yearly</option>
         </select>
-        <label class="form-label">Due Date</label>
-        <input type="date" id="recurring-due" class="form-input" required>
+        <div id="recurring-weekly-fields" class="schedule-fields hidden">
+          <label class="form-label" for="recurring-day-of-week">Weekday</label>
+          <select id="recurring-day-of-week" class="form-input">
+            <option value="1">Every Monday</option><option value="2">Every Tuesday</option>
+            <option value="3">Every Wednesday</option><option value="4">Every Thursday</option>
+            <option value="5">Every Friday</option><option value="6">Every Saturday</option>
+            <option value="0">Every Sunday</option>
+          </select>
+        </div>
+        <div id="recurring-monthly-fields" class="schedule-fields">
+          <label class="form-label" for="recurring-day-of-month">Day of Month</label>
+          <select id="recurring-day-of-month" class="form-input">
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option>
+          </select>
+        </div>
+        <div id="recurring-yearly-fields" class="schedule-fields hidden">
+          <div class="time-fields">
+            <label class="form-label" for="recurring-year-month">Month
+              <select id="recurring-year-month" class="form-input"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select>
+            </label>
+            <label class="form-label" for="recurring-year-day">Day
+              <input type="number" id="recurring-year-day" class="form-input" min="1" max="31" value="1">
+            </label>
+          </div>
+        </div>
+        <p class="form-error hidden" id="recurring-schedule-error" role="alert"></p>
         <label class="form-label">Reminder Timing</label>
         <select id="recurring-reminder" class="form-input">
           <option value="same-day">Same day</option>
@@ -822,7 +938,7 @@
           <input type="checkbox" id="recurring-active" checked>
           <span>Keep reminders active</span>
         </label>
-        <button type="submit" class="btn btn-primary full-width">Save Recurring Expense</button>
+        <button type="submit" class="btn btn-primary full-width" id="recurring-submit-btn">Save Recurring Expense</button>
       </form>
     </div>
   </div>
@@ -870,8 +986,23 @@
     </div>
   </div>
 
+  <!-- Skip Recurring Occurrence Dialog -->
+  <div id="modal-skip-occurrence" class="modal" role="dialog" aria-modal="true" aria-labelledby="skip-occurrence-title" aria-describedby="skip-occurrence-description">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+      <h3 id="skip-occurrence-title">Skip this recurring bill?</h3>
+      <p id="skip-occurrence-name" class="dialog-emphasis"></p>
+      <p id="skip-occurrence-description">This will mark only this occurrence as skipped. No expense will be created. Future occurrences will continue normally.</p>
+      <p class="form-error hidden" id="skip-occurrence-error" role="alert"></p>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-ghost" id="skip-occurrence-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="skip-occurrence-confirm">Skip Occurrence</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Confirm Dialog -->
-  <div id="modal-confirm" class="modal" role="dialog" aria-modal="true">
+  <div id="modal-confirm" class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
     <div class="modal-backdrop"></div>
     <div class="modal-dialog">
       <h3 id="confirm-title">Confirm</h3>

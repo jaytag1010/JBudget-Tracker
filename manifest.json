@@ -1,6 +1,7 @@
 {
   "name": "SpendWise",
   "short_name": "SpendWise",
+  "version": "2.2.0",
   "description": "Track every peso, reach every goal — fast, mobile-friendly, cloud-synced.",
   "start_url": "/",
   "scope": "/",

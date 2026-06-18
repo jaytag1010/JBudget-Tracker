@@ -7,7 +7,7 @@ import {
   collection, doc,
   addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
   query, orderBy, onSnapshot,
-  Timestamp, serverTimestamp, writeBatch,
+  Timestamp, serverTimestamp, writeBatch, runTransaction,
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ── Collection name constants ─────────────────
@@ -250,7 +250,7 @@ export async function addRecurringExpense(data) {
   return addDoc(userCol(COL.recurring), {
     ...data,
     amount: Number(data.amount),
-    dueDate: Timestamp.fromDate(new Date(data.dueDate)),
+    dueDate: Timestamp.fromDate(localDate(data.dueDate)),
     active: data.active !== false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -261,7 +261,7 @@ export async function updateRecurringExpense(id, data) {
   const payload = {
     ...data,
     amount: Number(data.amount),
-    dueDate: Timestamp.fromDate(new Date(data.dueDate)),
+    dueDate: Timestamp.fromDate(localDate(data.dueDate)),
     active: data.active !== false,
     updatedAt: serverTimestamp(),
   };
@@ -279,17 +279,74 @@ export function listenRecurringExpenses(callback) {
   });
 }
 
-export async function setRecurringOccurrenceStatus(id, data) {
-  return setDoc(userDoc(COL.recurringOccurrences, id), {
-    ...data,
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+export async function skipRecurringOccurrence(id, data) {
+  const occurrenceRef = userDoc(COL.recurringOccurrences, id);
+  const notificationRef = userDoc(COL.notifications, `recurring-${id}`);
+  return runTransaction(db, async transaction => {
+    const existing = await transaction.get(occurrenceRef);
+    const status = existing.exists() ? existing.data().status : "pending";
+    if (status === "paid") throw occurrenceError("occurrence-already-paid", "This occurrence is already paid.");
+    if (status === "skipped") throw occurrenceError("occurrence-already-skipped", "This occurrence is already skipped.");
+    transaction.set(occurrenceRef, {
+      ...data,
+      userId: uid(),
+      status: "skipped",
+      resolvedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    transaction.delete(notificationRef);
+  });
+}
+
+export async function payRecurringOccurrence(id, occurrence, expense) {
+  const occurrenceRef = userDoc(COL.recurringOccurrences, id);
+  const expenseRef = doc(userCol(COL.expenses));
+  const notificationRef = userDoc(COL.notifications, `recurring-${id}`);
+  await runTransaction(db, async transaction => {
+    const existing = await transaction.get(occurrenceRef);
+    const status = existing.exists() ? existing.data().status : "pending";
+    if (status === "paid") throw occurrenceError("occurrence-already-paid", "This occurrence is already paid.");
+    if (status === "skipped") throw occurrenceError("occurrence-already-skipped", "This occurrence was skipped and cannot be paid.");
+
+    transaction.set(expenseRef, {
+      ...expense,
+      amount: Number(expense.amount),
+      date: Timestamp.fromDate(localDate(expense.date)),
+      recurringExpenseId: occurrence.recurringId,
+      recurringOccurrenceId: id,
+      createdAt: serverTimestamp(),
+    });
+    transaction.set(occurrenceRef, {
+      ...occurrence,
+      userId: uid(),
+      status: "paid",
+      expenseId: expenseRef.id,
+      resolvedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    transaction.delete(notificationRef);
+  });
+  return { id: expenseRef.id };
 }
 
 export function listenRecurringOccurrences(callback) {
   return onSnapshot(userCol(COL.recurringOccurrences), snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
+}
+
+function occurrenceError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+function localDate(value) {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(value);
 }
 
 // ─────────────────────────────────────────────

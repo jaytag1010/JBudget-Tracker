@@ -1,5 +1,5 @@
 // ─── Expense Module ───────────────────────────
-import { addExpense, updateExpense, deleteExpense, addRecurringExpense, setRecurringOccurrenceStatus } from "../firebase/db.js";
+import { addExpense, updateExpense, deleteExpense, addRecurringExpense, payRecurringOccurrence } from "../firebase/db.js";
 import { openModal, closeModal, showToast, confirmDialog } from "./ui.js";
 import { formatDate, formatDateInput, todayISO, evaluateExpression, formatCurrency } from "./utils.js";
 import { getCategories, getPaymentMethods } from "./settings.js";
@@ -140,26 +140,31 @@ export function initExpenseForm() {
         await updateExpense(editingId, data);
         showToast("Expense updated");
       } else {
-        const ref = await addExpense(data);
         if (pendingRecurringOccurrence) {
-          await setRecurringOccurrenceStatus(pendingRecurringOccurrence.id, {
+          await payRecurringOccurrence(pendingRecurringOccurrence.id, {
             recurringId: pendingRecurringOccurrence.recurringId,
             recurringName: pendingRecurringOccurrence.recurringName,
             dueDate: pendingRecurringOccurrence.dueDate,
             amount: pendingRecurringOccurrence.amount,
             category: pendingRecurringOccurrence.category,
-            status: "paid",
-            expenseId: ref.id,
-          });
+          }, data);
+        } else {
+          await addExpense(data);
         }
         if (document.getElementById("expense-recurring")?.checked) {
           const recurringName = document.getElementById("expense-recurring-name").value.trim() || note || category;
           const dueDate = document.getElementById("expense-recurring-due").value || date;
+          const frequency = document.getElementById("expense-recurring-frequency").value;
+          const due = new Date(`${dueDate}T00:00:00`);
+          const schedule = frequency === "weekly" ? { dayOfWeek: due.getDay() }
+            : frequency === "yearly" ? { month: due.getMonth() + 1, dayOfMonth: due.getDate() }
+              : { dayOfMonth: due.getDate() };
           await addRecurringExpense({
             name: recurringName,
             amount,
             category,
-            frequency: document.getElementById("expense-recurring-frequency").value,
+            frequency,
+            ...schedule,
             dueDate,
             reminderTiming: document.getElementById("expense-recurring-reminder").value,
           });
@@ -170,7 +175,12 @@ export function initExpenseForm() {
       closeModal("modal-expense");
     } catch (err) {
       console.error(err);
-      showToast("Error saving expense", "error");
+      const message = err?.code === "occurrence-already-paid"
+        ? "This bill occurrence is already paid"
+        : err?.code === "occurrence-already-skipped"
+          ? "This skipped occurrence cannot be paid"
+          : "Error saving expense";
+      showToast(message, "error");
     } finally {
       btn.disabled = false;
       btn.textContent = editingId ? "Update Expense" : "Save Expense";

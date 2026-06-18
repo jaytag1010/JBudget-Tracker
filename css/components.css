@@ -1772,6 +1772,90 @@ input[type="number"] { -moz-appearance: textfield; }
   gap: 8px;
 }
 
+/* Version 2.2 notification settings and recurrence controls */
+.notification-settings-page fieldset { min-width: 0; }
+.settings-section legend {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 800;
+  padding: 0 4px;
+}
+.settings-toggle-row {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 0;
+  color: var(--text-primary);
+}
+.settings-toggle-row + .settings-toggle-row { border-top: 1px solid var(--border); }
+.settings-toggle-row span { min-width: 0; }
+.settings-toggle-row strong,
+.settings-toggle-row small { display: block; }
+.settings-toggle-row small {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.settings-toggle-row input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+.permission-panel {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+}
+.permission-panel strong { color: var(--text-primary); }
+.permission-panel p { margin: 5px 0 10px; font-size: 12px; line-height: 1.4; }
+.permission-panel .btn { min-height: 42px; }
+.choice-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.choice-group label {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.choice-group input { accent-color: var(--accent); }
+.time-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.time-fields .form-label { margin: 0; }
+.time-fields .form-input { margin-top: 6px; }
+.settings-note,
+.settings-save-status { color: var(--text-muted); font-size: 12px; line-height: 1.4; }
+.settings-save-status { min-height: 18px; text-align: center; }
+.form-error { color: var(--red); font-size: 12px; font-weight: 700; line-height: 1.4; }
+.dialog-emphasis { color: var(--text-primary); font-weight: 800; margin-bottom: 8px; }
+.schedule-fields { padding: 2px 0; }
+.mini-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+@media (max-width: 380px) {
+  .header-actions .icon-btn { width: 36px; height: 36px; }
+  .choice-group { grid-template-columns: 1fr; }
+  .bill-row { align-items: flex-start; }
+  .bill-actions { flex-wrap: wrap; justify-content: flex-end; }
+}
+
 /* ══════════════════════════════════════════════
    V2 — Budget: Allocation Row
    ══════════════════════════════════════════════ */

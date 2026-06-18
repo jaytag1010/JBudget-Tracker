@@ -5,6 +5,8 @@ let _expenses = [];
 let _budgets = [];
 let _goals = [];
 
+document.addEventListener("spendwise:notification-settings", renderFinancialWidgets);
+
 export function updateFinancialExpenses(expenses) {
   _expenses = expenses || [];
   renderFinancialWidgets();
@@ -102,11 +104,11 @@ function syncOverspendingNotifications() {
   const alerts = [];
   const total = Number(budget.total || 0);
   const spent = sumAmounts(expenses);
-  if (total > 0) addBudgetAlert(alerts, "Overall budget", spent, total, expenses);
+  if (total > 0) addBudgetAlert(alerts, key, "Overall budget", spent, total, expenses);
 
   const byCat = groupByCategory(expenses);
   Object.entries(budget.categories || {}).forEach(([cat, amount]) => {
-    addBudgetAlert(alerts, `${cat} budget`, byCat[cat] || 0, Number(amount), expenses.filter(e => e.category === cat));
+    addBudgetAlert(alerts, key, `${cat} budget`, byCat[cat] || 0, Number(amount), expenses.filter(e => e.category === cat));
   });
 
   alerts.slice(0, 8).forEach(alert => {
@@ -117,27 +119,39 @@ function syncOverspendingNotifications() {
       title: alert.title,
       message: [alert.message, alert.pace].filter(Boolean).join(" "),
       sourceId: alert.id,
+      externalCategory: "budgetAlerts",
+      threshold: alert.threshold,
+      isRelevant: () => {
+        const latest = currentScope();
+        const latestSpent = alert.label === "Overall budget"
+          ? sumAmounts(latest.expenses)
+          : sumAmounts(latest.expenses.filter(expense => `${expense.category} budget` === alert.label));
+        const latestBudget = alert.label === "Overall budget"
+          ? Number(latest.budget.total || 0)
+          : Number(latest.budget.categories?.[alert.label.replace(/ budget$/, "")] || 0);
+        return latestBudget > 0 && (latestSpent / latestBudget) * 100 >= alert.threshold;
+      },
     });
   });
 }
 
-function addBudgetAlert(alerts, label, spent, budget, scopedExpenses) {
+function addBudgetAlert(alerts, period, label, spent, budget, scopedExpenses) {
   if (!budget || spent <= 0) return;
   const used = spent / budget;
   const thresholds = [1, .95, .9, .8];
-  const hit = thresholds.find(t => used >= t);
-  if (!hit) return;
-
+  const reached = thresholds.filter(threshold => used >= threshold);
+  if (!reached.length) return;
   const percent = Math.round(used * 100);
-  const level = used >= 1 ? "danger" : used >= .95 ? "critical" : "warn";
   const projected = projectedOverage(scopedExpenses, budget);
-  alerts.push({
-    id: `budget-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-    level,
-    title: `${label} is ${percent}% used.`,
-    message: `${formatCurrency(spent)} of ${formatCurrency(budget)} spent this month.`,
+  reached.forEach(threshold => alerts.push({
+    id: `budget-${period}-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Math.round(threshold * 100)}`,
+    label,
+    threshold: Math.round(threshold * 100),
+    level: threshold >= 1 ? "danger" : threshold >= .95 ? "critical" : "warn",
+    title: `${label} reached the ${Math.round(threshold * 100)}% alert.`,
+    message: `${formatCurrency(spent)} of ${formatCurrency(budget)} spent this month (${percent}% used).`,
     pace: projected > 0 ? `Based on your current pace, you may exceed it by ${formatCurrency(projected)}.` : "",
-  });
+  }));
 }
 
 function projectedOverage(expenses, budget) {
