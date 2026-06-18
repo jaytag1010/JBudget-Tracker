@@ -1,10 +1,15 @@
 // ─── Dashboard Module ─────────────────────────
-import { formatCurrency, greeting, monthKey, expensesForMonth, groupByCategory } from "./utils.js";
+import {
+  formatCurrency, timeBasedGreeting, firstName, weekdaySubtitle,
+  monthKey, expensesForMonth, groupByCategory,
+} from "./utils.js";
 import { renderExpenseList } from "./expenses.js";
 
 // ── State ─────────────────────────────────────
 let _allExpenses = [];
 let _insightMode = "month";   // "month" | "year"
+let _profileDisplayName = "Friend";
+let _greetingTimer = null;
 
 // ── Update Dashboard ──────────────────────────
 export function updateDashboard(expenses) {
@@ -23,6 +28,12 @@ export function initInsightsToggle() {
     ?.addEventListener("click",  () => setInsightMode("year"));
 }
 
+export function initGreetingClock() {
+  updateGreeting();
+  if (_greetingTimer) clearInterval(_greetingTimer);
+  _greetingTimer = setInterval(updateGreeting, 60000);
+}
+
 function setInsightMode(mode) {
   _insightMode = mode;
   document.getElementById("insight-month-tab")?.classList.toggle("active", mode === "month");
@@ -33,7 +44,15 @@ function setInsightMode(mode) {
 // ── Greeting ──────────────────────────────────
 function updateGreeting() {
   const el = document.getElementById("greeting-text");
-  if (el) el.textContent = greeting();
+  const subtitle = document.getElementById("greeting-subtitle");
+  const now = new Date();
+  if (el) el.textContent = `${timeBasedGreeting(now)}, ${firstName(_profileDisplayName)}`;
+  if (subtitle) subtitle.textContent = weekdaySubtitle(now);
+}
+
+export function setDashboardProfileName(displayName) {
+  _profileDisplayName = displayName || "Friend";
+  updateGreeting();
 }
 
 // ── Recent Transactions ───────────────────────

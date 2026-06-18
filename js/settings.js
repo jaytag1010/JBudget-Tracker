@@ -25,8 +25,10 @@ export const getPaymentMethods = () => _paymentMethods;
 // Called by other modules after data loads
 let _onCatsChanged     = null;
 let _onPaymentsChanged = null;
+let _onProfileChanged  = null;
 export function onCategoriesChanged(fn)     { _onCatsChanged = fn; }
 export function onPaymentMethodsChanged(fn) { _onPaymentsChanged = fn; }
+export function onProfileChanged(fn)        { _onProfileChanged = fn; }
 
 // ── Bootstrap ────────────────────────────────
 export async function initSettings() {
@@ -332,6 +334,7 @@ function renderProfileSurfaces() {
       : '<span class="header-symbol">👤</span>';
   }
   if (name) name.textContent = displayName;
+  _onProfileChanged?.(displayName);
   if (email) email.textContent = displayEmail;
   if (profileName) profileName.textContent = displayName;
   if (profileEmail) profileEmail.textContent = displayEmail;

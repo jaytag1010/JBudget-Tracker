@@ -1,12 +1,12 @@
 // ─── App Entry Point ──────────────────────────
 import { listenExpenses } from "../firebase/db.js";
 import { navigateTo, initConfirmDialog, initModalBackdrops, closeAllModals, showToast } from "./ui.js";
-import { initSettings, onCategoriesChanged } from "./settings.js";
+import { initSettings, onCategoriesChanged, onProfileChanged } from "./settings.js";
 import { initExpenseForm, openAddExpense, renderCategoryGrid } from "./expenses.js";
 import { initBudgets, updateBudgetExpenses } from "./budgets.js";
 import { initSavings } from "./savings.js";
 import { initHistory, updateHistory } from "./history.js";
-import { updateDashboard, initInsightsToggle } from "./dashboard.js";
+import { updateDashboard, initInsightsToggle, initGreetingClock, setDashboardProfileName } from "./dashboard.js";
 import { initRecurring } from "./recurring.js";
 import { updateFinancialExpenses } from "./financial.js";
 import { initNotifications } from "./notifications.js";
@@ -68,6 +68,7 @@ async function initApp(user) {
     initRecurring();
     initNotifications();
     initInsightsToggle();
+    initGreetingClock();
 
     listenExpenses(expenses => {
       updateDashboard(expenses);
@@ -77,6 +78,7 @@ async function initApp(user) {
     });
 
     onCategoriesChanged(() => renderCategoryGrid(null));
+    onProfileChanged(setDashboardProfileName);
     renderUserProfile(user);
     dismissLoading();
 

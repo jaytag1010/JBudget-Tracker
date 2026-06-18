@@ -271,6 +271,22 @@ ul { list-style: none; }
   font-weight: 700;
   color: var(--text-primary);
 }
+.greeting-title {
+  font-size: 18px;
+  line-height: 1.2;
+  max-width: 280px;
+  overflow-wrap: anywhere;
+}
+.greeting-subtitle {
+  margin-top: 3px;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+@media (max-width: 380px) {
+  .greeting-title { max-width: 210px; font-size: 16px; }
+  .greeting-subtitle { max-width: 210px; }
+}
 .header-badge {
   font-size: 14px;
   font-weight: 600;

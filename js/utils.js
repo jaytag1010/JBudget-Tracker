@@ -32,10 +32,31 @@ export function monthLabel(key) {
 }
 
 export function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
+  return timeBasedGreeting(new Date());
+}
+
+export function timeBasedGreeting(date = new Date()) {
+  const h = date.getHours();
+  if (h >= 5 && h < 12) return "Good Morning";
+  if (h >= 12 && h < 17) return "Good Afternoon";
+  return "Good Evening";
+}
+
+export function firstName(displayName, fallback = "Friend") {
+  const clean = String(displayName || "").trim();
+  return clean ? clean.split(/\s+/)[0] : fallback;
+}
+
+export function weekdaySubtitle(date = new Date()) {
+  return [
+    "Ready for a new financial week?",
+    "Let's start the week strong.",
+    "Keep your spending on track.",
+    "Halfway through the week.",
+    "A little planning goes a long way.",
+    "Weekend spending is coming up.",
+    "Enjoy your weekend wisely.",
+  ][date.getDay()];
 }
 
 // Filter expenses to a given YYYY-MM month string
