@@ -1,7 +1,8 @@
 import {
-  listenNotifications, upsertNotification, addSystemNotification,
+  listenNotifications, upsertNotification, upsertRecurringNotification, addSystemNotification,
   markAllNotificationsRead, clearReadNotifications, markNotificationRead,
-  deleteNotification, listenProfileSettings, updateProfileSettings,
+  deleteRecurringNotificationsForOccurrences,
+  listenProfileSettings, updateProfileSettings,
 } from "../firebase/db.js";
 import { auth } from "../firebase/config.js";
 import { showToast } from "./ui.js";
@@ -9,10 +10,13 @@ import {
   isQuietHoursActive, millisecondsUntilQuietHoursEnd,
   normalizeNotificationSettings, validateQuietHours,
 } from "./notificationPrefs.js";
+import { occurrenceResolutionMap, shouldIncludeRecurringNotification } from "./recurrence.js";
 
 let _notifications = [];
 let _settings = normalizeNotificationSettings();
 let _settingsReady = false;
+let _recurringResolutionsReady = false;
+let _recurringResolutions = new Map();
 const _delayed = new Map();
 
 export function initNotifications() {
@@ -35,15 +39,25 @@ export function getNotificationSettings() {
 }
 
 export function notifyGenerated(id, data) {
-  const inApp = upsertNotification(id, {
+  const payload = {
     title: data.title,
     message: data.message,
     type: data.type || "system",
     icon: data.icon || iconForType(data.type),
     severity: data.severity || "info",
     sourceId: data.sourceId || id,
-  }).catch(error => console.warn("Notification sync failed", error));
-  inApp.then(() => queueExternalNotification(id, data));
+    recurringExpenseId: data.recurringExpenseId || null,
+    occurrenceId: data.occurrenceId || null,
+    occurrenceDate: data.occurrenceDate || null,
+    notificationType: data.notificationType || null,
+  };
+  const write = data.type === "recurring" && data.occurrenceId
+    ? upsertRecurringNotification(id, payload, data.occurrenceId)
+    : upsertNotification(id, payload);
+  const inApp = write.catch(error => console.warn("Notification sync failed", error));
+  inApp.then(created => {
+    if (created !== false) queueExternalNotification(id, data);
+  });
   return inApp;
 }
 
@@ -60,11 +74,22 @@ export function notifyExternal(id, data) {
   queueExternalNotification(id, data);
 }
 
-export function resolveGeneratedNotification(id) {
-  const delayed = _delayed.get(id);
-  if (delayed) clearTimeout(delayed);
-  _delayed.delete(id);
-  return deleteNotification(id).catch(error => console.warn("Notification resolution failed", error));
+export function setRecurringResolutionState(resolutions, ready = true) {
+  _recurringResolutions = occurrenceResolutionMap(resolutions);
+  _recurringResolutionsReady = ready;
+  renderNotificationBadge();
+  renderNotificationCenter();
+}
+
+export function resolveRecurringNotifications(occurrenceIds) {
+  occurrenceIds.forEach(id => {
+    const notificationId = `recurring-${id}`;
+    const delayed = _delayed.get(notificationId);
+    if (delayed) clearTimeout(delayed);
+    _delayed.delete(notificationId);
+  });
+  return deleteRecurringNotificationsForOccurrences(occurrenceIds)
+    .catch(error => console.warn("Recurring notification reconciliation failed", error));
 }
 
 function bindNotificationEvents() {
@@ -281,7 +306,7 @@ function delivered(key) {
 function renderNotificationBadge() {
   const badge = document.getElementById("notification-badge");
   if (!badge) return;
-  const unread = _notifications.filter(notification => notification.read !== true).length;
+  const unread = activeNotifications().filter(notification => notification.read !== true).length;
   badge.classList.toggle("hidden", unread === 0);
   badge.textContent = unread > 9 ? "9+" : String(unread);
 }
@@ -289,12 +314,13 @@ function renderNotificationBadge() {
 function renderNotificationCenter() {
   const list = document.getElementById("notification-list");
   if (!list) return;
-  if (!_notifications.length) {
+  const notifications = activeNotifications();
+  if (!notifications.length) {
     list.innerHTML = '<p class="empty-msg">No notifications yet.</p>';
     return;
   }
   list.innerHTML = "";
-  _notifications.forEach(item => {
+  notifications.forEach(item => {
     const row = document.createElement("div");
     row.className = `notification-item ${item.read === true ? "read" : "unread"} ${item.severity || ""}`;
     row.tabIndex = 0;
@@ -314,6 +340,14 @@ function renderNotificationCenter() {
       }
     });
     list.appendChild(row);
+  });
+}
+
+function activeNotifications() {
+  return _notifications.filter(notification => {
+    if (notification.type !== "recurring") return true;
+    if (!_recurringResolutionsReady) return false;
+    return shouldIncludeRecurringNotification(notification, _recurringResolutions, _recurringResolutionsReady);
   });
 }
 

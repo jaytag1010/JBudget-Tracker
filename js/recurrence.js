@@ -27,6 +27,26 @@ export function occurrenceId(recurringId, dueDate) {
   return `${recurringId}_${dateKey(dueDate)}`;
 }
 
+export function occurrenceResolutionMap(resolutions = []) {
+  return new Map(resolutions.map(resolution => [resolution.occurrenceId || resolution.id, resolution]));
+}
+
+export function isOccurrenceResolved(id, resolutionsById) {
+  const status = String(resolutionsById?.get(id)?.status || "").toLowerCase();
+  return status === "paid" || status === "skipped";
+}
+
+export function recurringDataReady(templatesLoaded, resolutionsLoaded) {
+  return templatesLoaded === true && resolutionsLoaded === true;
+}
+
+export function shouldIncludeRecurringNotification(notification, resolutionsById, resolutionsLoaded) {
+  if (!resolutionsLoaded) return false;
+  const id = notification.occurrenceId || notification.sourceId
+    || (notification.id?.startsWith("recurring-") ? notification.id.slice("recurring-".length) : "");
+  return !isOccurrenceResolved(id, resolutionsById);
+}
+
 export function daysInMonth(year, monthIndex) {
   return new Date(year, monthIndex + 1, 0).getDate();
 }

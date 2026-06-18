@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   dateKey, firstOccurrenceOnOrAfter, nextOccurrenceDate, occurrenceId,
-  recurrenceLabel, scheduleFor, validateSchedule,
+  isOccurrenceResolved, occurrenceResolutionMap, recurrenceLabel, recurringDataReady,
+  scheduleFor, shouldIncludeRecurringNotification, validateSchedule,
 } from "../js/recurrence.js";
 
 test("weekly schedules use JavaScript weekday values with Sunday as zero", () => {
@@ -59,6 +60,34 @@ test("yearly validation rejects impossible month and day combinations", () => {
 
 test("occurrence IDs use stable local date-only keys", () => {
   assert.equal(occurrenceId("abc", new Date(2026, 5, 25, 23, 30)), "abc_2026-06-25");
+  assert.equal(occurrenceId("abc", new Date(2026, 5, 25, 0, 1)), "abc_2026-06-25");
+});
+
+test("resolution lookup supports legacy document IDs and normalized status capitalization", () => {
+  const resolutions = occurrenceResolutionMap([
+    { id: "weekly_2026-06-18", status: "Skipped" },
+    { id: "legacy-doc", occurrenceId: "rent_2026-06-18", status: "PAID" },
+  ]);
+  assert.equal(isOccurrenceResolved("weekly_2026-06-18", resolutions), true);
+  assert.equal(isOccurrenceResolved("rent_2026-06-18", resolutions), true);
+  assert.equal(isOccurrenceResolved("weekly_2026-06-25", resolutions), false);
+});
+
+test("refresh reconstruction excludes a skipped occurrence but keeps next week active", () => {
+  const skippedId = occurrenceId("weekly", new Date(2026, 5, 18));
+  const nextId = occurrenceId("weekly", new Date(2026, 5, 25));
+  const persistedFirestoreRecords = [{
+    id: skippedId,
+    occurrenceId: skippedId,
+    occurrenceDate: "2026-06-18",
+    status: "skipped",
+  }];
+  const afterRefresh = occurrenceResolutionMap(persistedFirestoreRecords);
+  assert.equal(recurringDataReady(true, false), false);
+  assert.equal(shouldIncludeRecurringNotification({ id: `recurring-${skippedId}`, occurrenceId: skippedId }, afterRefresh, false), false);
+  assert.equal(recurringDataReady(true, true), true);
+  assert.equal(shouldIncludeRecurringNotification({ id: `recurring-${skippedId}`, occurrenceId: skippedId }, afterRefresh, true), false);
+  assert.equal(shouldIncludeRecurringNotification({ id: `recurring-${nextId}`, occurrenceId: nextId }, afterRefresh, true), true);
 });
 
 test("legacy records infer schedule fields from their due date", () => {

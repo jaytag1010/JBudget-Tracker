@@ -6,42 +6,60 @@ import { openModal, closeModal, showToast, confirmDialog } from "./ui.js";
 import { formatCurrency, todayISO } from "./utils.js";
 import {
   dateKey, daysBetween, firstOccurrenceOnOrAfter, nextDueDate, occurrenceId,
-  occurrencesInRange, recurrenceLabel, reminderDays, scheduleFor, validateSchedule,
+  isOccurrenceResolved, occurrenceResolutionMap, occurrencesInRange,
+  recurrenceLabel, recurringDataReady, reminderDays, scheduleFor, validateSchedule,
 } from "./recurrence.js";
 import { getCategories } from "./settings.js";
 import { openAddExpense } from "./expenses.js";
 import {
   getNotificationSettings, notifyExternal, notifyGenerated, notifySystem,
-  resolveGeneratedNotification,
+  resolveRecurringNotifications, setRecurringResolutionState,
 } from "./notifications.js";
 
 let _items = [];
 let _occurrenceStatuses = [];
 let _editingId = null;
 let _skipTarget = null;
+let _templatesLoaded = false;
+let _resolutionsLoaded = false;
+let _resolutionsById = new Map();
+let _lastReconciledSignature = "";
 const _resolving = new Set();
 
 export function initRecurring() {
   bindRecurringEvents();
   listenRecurringExpenses(items => {
     _items = items;
-    renderRecurringPage();
-    renderUpcomingBills();
-    syncRecurringNotifications();
+    _templatesLoaded = true;
+    refreshRecurringViews();
   });
   listenRecurringOccurrences(items => {
     _occurrenceStatuses = items;
-    reconcileResolvedNotifications(items);
-    renderRecurringPage();
-    renderUpcomingBills();
-    syncRecurringNotifications();
+    _resolutionsById = occurrenceResolutionMap(items);
+    _resolutionsLoaded = true;
+    setRecurringResolutionState(items, false);
+    refreshRecurringViews();
   });
 }
 
-function reconcileResolvedNotifications(statuses) {
-  statuses
-    .filter(item => item.status === "paid" || item.status === "skipped")
-    .forEach(item => resolveGeneratedNotification(`recurring-${item.id}`));
+function refreshRecurringViews() {
+  if (!recurringDataReady(_templatesLoaded, _resolutionsLoaded)) return;
+  setRecurringResolutionState(_occurrenceStatuses, true);
+  reconcileResolvedNotifications();
+  renderRecurringPage();
+  renderUpcomingBills();
+  syncRecurringNotifications();
+}
+
+function reconcileResolvedNotifications() {
+  const resolvedIds = _occurrenceStatuses
+    .filter(item => isOccurrenceResolved(item.occurrenceId || item.id, _resolutionsById))
+    .map(item => item.occurrenceId || item.id)
+    .sort();
+  const signature = resolvedIds.join("|");
+  if (signature === _lastReconciledSignature) return;
+  _lastReconciledSignature = signature;
+  resolveRecurringNotifications(resolvedIds);
 }
 
 export function getRecurringExpenses() {
@@ -65,7 +83,12 @@ function bindRecurringEvents() {
     }
     if (event.key === "Tab") trapSkipFocus(event);
   });
-  document.addEventListener("spendwise:notification-settings", syncRecurringNotifications);
+  document.addEventListener("spendwise:notification-settings", () => {
+    if (recurringDataReady(_templatesLoaded, _resolutionsLoaded)) syncRecurringNotifications();
+  });
+  document.addEventListener("spendwise:occurrence-resolved", event => {
+    if (event.detail?.id) applyLocalResolution(event.detail);
+  });
 }
 
 function openAddRecurring() {
@@ -305,16 +328,27 @@ function buildVisibleOccurrences(now = new Date()) {
 }
 
 function buildOccurrences(item, start, end, today = new Date()) {
-  const statusMap = new Map(_occurrenceStatuses.map(status => [status.id, status]));
   return occurrencesInRange(item, start, end).map(due => {
     const id = occurrenceId(item.id, due);
-    const status = statusMap.get(id)?.status || "pending";
+    const resolved = isOccurrenceResolved(id, _resolutionsById);
+    const status = resolved ? String(_resolutionsById.get(id).status).toLowerCase() : "pending";
     return {
       id, item, due, dueKey: dateKey(due), status,
       overdue: status === "pending" && due < today,
       daysOverdue: Math.max(0, daysBetween(due, today)),
     };
   });
+}
+
+function applyLocalResolution(resolution) {
+  const normalized = { ...resolution, occurrenceId: resolution.occurrenceId || resolution.id };
+  const index = _occurrenceStatuses.findIndex(item => (item.occurrenceId || item.id) === normalized.occurrenceId);
+  if (index >= 0) _occurrenceStatuses[index] = { ..._occurrenceStatuses[index], ...normalized };
+  else _occurrenceStatuses.push(normalized);
+  _resolutionsById = occurrenceResolutionMap(_occurrenceStatuses);
+  setRecurringResolutionState(_occurrenceStatuses, true);
+  _lastReconciledSignature = "";
+  refreshRecurringViews();
 }
 
 function nextPayableOccurrence(item, now = new Date()) {
@@ -341,10 +375,14 @@ function syncRecurringNotifications() {
       title: `${occurrence.item.name} ${when}`,
       message: `${formatCurrency(occurrence.item.amount)} due on ${formatShortDate(occurrence.due)}.`,
       sourceId: occurrence.id,
+      recurringExpenseId: occurrence.item.id,
+      occurrenceId: occurrence.id,
+      occurrenceDate: occurrence.dueKey,
+      notificationType: occurrence.overdue ? "overdue" : days === 0 ? "due_today" : "reminder",
       externalCategory: occurrence.overdue ? "overdueBillAlerts" : "recurringBillReminders",
       daysUntilDue: days,
       daysOverdue: occurrence.daysOverdue,
-      isRelevant: () => !_occurrenceStatuses.some(status => status.id === occurrence.id && status.status !== "pending"),
+      isRelevant: () => !isOccurrenceResolved(occurrence.id, _resolutionsById),
     };
     if (inAppDue) notifyGenerated(`recurring-${occurrence.id}`, { ...payload, externalCategory: null });
     if (externalDue) notifyExternal(`recurring-${occurrence.id}`, payload);
@@ -393,6 +431,12 @@ async function confirmSkipOccurrence() {
   button.textContent = "Skipping...";
   try {
     await skipRecurringOccurrence(target.occurrence.id, occurrencePayload(target.occurrence));
+    applyLocalResolution({
+      ...occurrencePayload(target.occurrence),
+      id: target.occurrence.id,
+      occurrenceId: target.occurrence.id,
+      status: "skipped",
+    });
     closeModal("modal-skip-occurrence");
     _skipTarget = null;
     if (target.returnFocus?.isConnected) target.returnFocus.focus();
@@ -434,6 +478,8 @@ function payOccurrence(occurrence, button = null) {
 function occurrencePayload(occurrence) {
   return {
     recurringId: occurrence.item.id,
+    recurringExpenseId: occurrence.item.id,
+    occurrenceId: occurrence.id,
     recurringName: occurrence.item.name,
     occurrenceDate: occurrence.dueKey,
     dueDate: occurrence.dueKey,

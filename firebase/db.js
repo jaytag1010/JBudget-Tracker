@@ -284,12 +284,15 @@ export async function skipRecurringOccurrence(id, data) {
   const notificationRef = userDoc(COL.notifications, `recurring-${id}`);
   return runTransaction(db, async transaction => {
     const existing = await transaction.get(occurrenceRef);
-    const status = existing.exists() ? existing.data().status : "pending";
+    const status = String(existing.exists() ? existing.data().status : "pending").toLowerCase();
     if (status === "paid") throw occurrenceError("occurrence-already-paid", "This occurrence is already paid.");
     if (status === "skipped") throw occurrenceError("occurrence-already-skipped", "This occurrence is already skipped.");
     transaction.set(occurrenceRef, {
       ...data,
       userId: uid(),
+      recurringExpenseId: data.recurringExpenseId || data.recurringId,
+      occurrenceId: id,
+      occurrenceDate: data.occurrenceDate || data.dueDate,
       status: "skipped",
       resolvedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -304,7 +307,7 @@ export async function payRecurringOccurrence(id, occurrence, expense) {
   const notificationRef = userDoc(COL.notifications, `recurring-${id}`);
   await runTransaction(db, async transaction => {
     const existing = await transaction.get(occurrenceRef);
-    const status = existing.exists() ? existing.data().status : "pending";
+    const status = String(existing.exists() ? existing.data().status : "pending").toLowerCase();
     if (status === "paid") throw occurrenceError("occurrence-already-paid", "This occurrence is already paid.");
     if (status === "skipped") throw occurrenceError("occurrence-already-skipped", "This occurrence was skipped and cannot be paid.");
 
@@ -312,13 +315,16 @@ export async function payRecurringOccurrence(id, occurrence, expense) {
       ...expense,
       amount: Number(expense.amount),
       date: Timestamp.fromDate(localDate(expense.date)),
-      recurringExpenseId: occurrence.recurringId,
+      recurringExpenseId: occurrence.recurringExpenseId || occurrence.recurringId,
       recurringOccurrenceId: id,
       createdAt: serverTimestamp(),
     });
     transaction.set(occurrenceRef, {
       ...occurrence,
       userId: uid(),
+      recurringExpenseId: occurrence.recurringExpenseId || occurrence.recurringId,
+      occurrenceId: id,
+      occurrenceDate: occurrence.occurrenceDate || occurrence.dueDate,
       status: "paid",
       expenseId: expenseRef.id,
       resolvedAt: serverTimestamp(),
@@ -432,6 +438,31 @@ export async function upsertNotification(id, data) {
   }, { merge: true });
 }
 
+export async function upsertRecurringNotification(id, data, occurrenceId) {
+  const notificationRef = userDoc(COL.notifications, id);
+  const occurrenceRef = userDoc(COL.recurringOccurrences, occurrenceId);
+  return runTransaction(db, async transaction => {
+    const [occurrenceSnapshot, notificationSnapshot] = await Promise.all([
+      transaction.get(occurrenceRef),
+      transaction.get(notificationRef),
+    ]);
+    const occurrenceStatus = String(occurrenceSnapshot.data()?.status || "").toLowerCase();
+    if (occurrenceStatus === "paid" || occurrenceStatus === "skipped") {
+      transaction.delete(notificationRef);
+      return false;
+    }
+    const previous = notificationSnapshot.exists() ? notificationSnapshot.data() : null;
+    const changed = !previous || previous.title !== data.title || previous.message !== data.message;
+    transaction.set(notificationRef, {
+      ...data,
+      read: previous ? (changed ? false : previous.read === true) : false,
+      createdAt: previous?.createdAt || serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    return true;
+  });
+}
+
 export async function addSystemNotification(data) {
   return addDoc(userCol(COL.notifications), {
     ...data,
@@ -470,8 +501,22 @@ export async function markNotificationRead(id) {
   });
 }
 
-export async function deleteNotification(id) {
-  return deleteDoc(userDoc(COL.notifications, id));
+export async function deleteRecurringNotificationsForOccurrences(occurrenceIds) {
+  const resolved = new Set(occurrenceIds);
+  if (!resolved.size) return;
+  const snapshot = await getDocs(userCol(COL.notifications));
+  const matches = snapshot.docs.filter(notification => {
+    const data = notification.data();
+    if (data.type !== "recurring") return false;
+    const idFromDocument = notification.id.startsWith("recurring-")
+      ? notification.id.slice("recurring-".length) : "";
+    return resolved.has(data.occurrenceId) || resolved.has(data.sourceId) || resolved.has(idFromDocument);
+  });
+  for (let index = 0; index < matches.length; index += 450) {
+    const batch = writeBatch(db);
+    matches.slice(index, index + 450).forEach(notification => batch.delete(notification.ref));
+    await batch.commit();
+  }
 }
 
 // ─────────────────────────────────────────────

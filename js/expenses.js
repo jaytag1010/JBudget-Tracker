@@ -141,13 +141,25 @@ export function initExpenseForm() {
         showToast("Expense updated");
       } else {
         if (pendingRecurringOccurrence) {
-          await payRecurringOccurrence(pendingRecurringOccurrence.id, {
+          const occurrence = {
             recurringId: pendingRecurringOccurrence.recurringId,
+            recurringExpenseId: pendingRecurringOccurrence.recurringId,
             recurringName: pendingRecurringOccurrence.recurringName,
+            occurrenceId: pendingRecurringOccurrence.id,
+            occurrenceDate: pendingRecurringOccurrence.dueDate,
             dueDate: pendingRecurringOccurrence.dueDate,
             amount: pendingRecurringOccurrence.amount,
             category: pendingRecurringOccurrence.category,
-          }, data);
+          };
+          const paidExpense = await payRecurringOccurrence(pendingRecurringOccurrence.id, occurrence, data);
+          document.dispatchEvent(new CustomEvent("spendwise:occurrence-resolved", {
+            detail: {
+              ...occurrence,
+              id: pendingRecurringOccurrence.id,
+              status: "paid",
+              expenseId: paidExpense.id,
+            },
+          }));
         } else {
           await addExpense(data);
         }
