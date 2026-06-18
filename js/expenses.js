@@ -304,7 +304,7 @@ function initCalculatorModal() {
 }
 
 // ── Build a transaction card DOM element ──────
-export function buildTxCard(expense) {
+export function buildTxCard(expense, { showActions = false } = {}) {
   const cats    = getCategories();
   const cat     = cats.find(c => c.name === expense.category) || { icon: "💸", color: "#7c6cf7" };
   const card    = document.createElement("div");
@@ -320,26 +320,55 @@ export function buildTxCard(expense) {
     <div class="tx-right">
       <div class="tx-amount">−₱${Number(expense.amount).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
       <div class="tx-date">${formatDate(expense.date)}</div>
+      ${showActions ? `<div class="tx-actions">
+        <button type="button" class="tx-action-btn" data-edit-expense aria-label="Edit ${expense.category} expense" title="Edit expense">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4z"/></svg>
+        </button>
+        <button type="button" class="tx-action-btn danger" data-delete-expense aria-label="Delete ${expense.category} expense" title="Delete expense">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
+        </button>
+      </div>` : ""}
     </div>`;
 
-  // Long-press / tap to edit
+  if (!showActions) {
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-label", `Edit ${expense.category} expense from ${formatDate(expense.date)}`);
+  }
   card.addEventListener("click", () => openEditExpense(expense));
+  card.addEventListener("keydown", event => {
+    if (!showActions && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      openEditExpense(expense);
+    }
+  });
   card.querySelector(".tx-cat-action")?.addEventListener("click", e => {
     e.stopPropagation();
     document.dispatchEvent(new CustomEvent("spendwise:category-insight", {
       detail: { category: expense.category },
     }));
   });
+  card.querySelector("[data-edit-expense]")?.addEventListener("click", event => {
+    event.stopPropagation();
+    openEditExpense(expense);
+  });
+  card.querySelector("[data-delete-expense]")?.addEventListener("click", async event => {
+    event.stopPropagation();
+    const button = event.currentTarget;
+    button.disabled = true;
+    await handleDeleteExpense(expense.id);
+    if (button.isConnected) button.disabled = false;
+  });
 
   return card;
 }
 
 // ── Render a list of expenses into a container ─
-export function renderExpenseList(containerEl, expenses) {
+export function renderExpenseList(containerEl, expenses, options = {}) {
   if (!expenses.length) {
     containerEl.innerHTML = '<p class="empty-msg">No transactions found.</p>';
     return;
   }
   containerEl.innerHTML = "";
-  expenses.forEach(e => containerEl.appendChild(buildTxCard(e)));
+  expenses.forEach(e => containerEl.appendChild(buildTxCard(e, options)));
 }

@@ -127,7 +127,7 @@ function applyFilters() {
   const filtered = getFilteredExpenses();
 
   const list = document.getElementById("history-list");
-  if (list) renderExpenseList(list, filtered);
+  if (list) renderExpenseList(list, filtered, { showActions: true });
   renderSpendingCalendar(filtered);
 
   const total = filtered.reduce((s, e) => s + Number(e.amount || 0), 0);

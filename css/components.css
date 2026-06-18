@@ -655,6 +655,29 @@
   color: var(--text-muted);
   margin-top: 2px;
 }
+.tx-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 7px;
+}
+.tx-action-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+}
+.tx-action-btn:hover,
+.tx-action-btn:active { color: var(--accent); border-color: var(--accent); }
+.tx-action-btn.danger { color: var(--red); }
+.tx-action-btn.danger:hover,
+.tx-action-btn.danger:active { background: var(--red-soft); border-color: var(--red); }
+.tx-action-btn svg { width: 16px; height: 16px; }
 
 /* ─── Overall Budget Card ─── */
 .overall-budget-card {
