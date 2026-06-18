@@ -470,6 +470,10 @@ export async function markNotificationRead(id) {
   });
 }
 
+export async function deleteNotification(id) {
+  return deleteDoc(userDoc(COL.notifications, id));
+}
+
 // ─────────────────────────────────────────────
 //  PROFILE SETTINGS
 // ─────────────────────────────────────────────

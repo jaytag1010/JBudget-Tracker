@@ -10,7 +10,10 @@ import {
 } from "./recurrence.js";
 import { getCategories } from "./settings.js";
 import { openAddExpense } from "./expenses.js";
-import { getNotificationSettings, notifyExternal, notifyGenerated, notifySystem } from "./notifications.js";
+import {
+  getNotificationSettings, notifyExternal, notifyGenerated, notifySystem,
+  resolveGeneratedNotification,
+} from "./notifications.js";
 
 let _items = [];
 let _occurrenceStatuses = [];
@@ -28,10 +31,17 @@ export function initRecurring() {
   });
   listenRecurringOccurrences(items => {
     _occurrenceStatuses = items;
+    reconcileResolvedNotifications(items);
     renderRecurringPage();
     renderUpcomingBills();
     syncRecurringNotifications();
   });
+}
+
+function reconcileResolvedNotifications(statuses) {
+  statuses
+    .filter(item => item.status === "paid" || item.status === "skipped")
+    .forEach(item => resolveGeneratedNotification(`recurring-${item.id}`));
 }
 
 export function getRecurringExpenses() {

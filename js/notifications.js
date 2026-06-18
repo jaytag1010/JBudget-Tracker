@@ -1,7 +1,7 @@
 import {
   listenNotifications, upsertNotification, addSystemNotification,
   markAllNotificationsRead, clearReadNotifications, markNotificationRead,
-  listenProfileSettings, updateProfileSettings,
+  deleteNotification, listenProfileSettings, updateProfileSettings,
 } from "../firebase/db.js";
 import { auth } from "../firebase/config.js";
 import { showToast } from "./ui.js";
@@ -58,6 +58,13 @@ export function notifySystem(title, message) {
 
 export function notifyExternal(id, data) {
   queueExternalNotification(id, data);
+}
+
+export function resolveGeneratedNotification(id) {
+  const delayed = _delayed.get(id);
+  if (delayed) clearTimeout(delayed);
+  _delayed.delete(id);
+  return deleteNotification(id).catch(error => console.warn("Notification resolution failed", error));
 }
 
 function bindNotificationEvents() {
