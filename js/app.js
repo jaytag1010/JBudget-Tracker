@@ -18,7 +18,7 @@ import { updateFinancialExpenses } from "./financial.js";
 import { initNotifications } from "./notifications.js";
 import {
   initAuth, signInWithGoogle, signInWithEmail, signUpWithEmail,
-  authErrorMessage,
+  authErrorMessage, signOutUser,
 } from "./auth.js";
 
 let currentUser = null;
@@ -65,8 +65,21 @@ function showBlockingState(state) {
       <h1>${state.title}</h1>
       <p class="loading-state-message">${state.message}</p>
       ${state.retryable ? '<button type="button" class="loading-retry-btn" id="loading-retry-btn">Retry Connection</button>' : ""}
+      ${state.reauthenticate ? '<button type="button" class="loading-retry-btn" id="loading-signin-btn">Sign In Again</button>' : ""}
     </div>`;
   document.getElementById("loading-retry-btn")?.addEventListener("click", retryConnection);
+  document.getElementById("loading-signin-btn")?.addEventListener("click", async event => {
+    event.currentTarget.disabled = true;
+    event.currentTarget.textContent = "Signing Out...";
+    try {
+      clearFirestoreListeners();
+      await signOutUser();
+    } catch (error) {
+      console.error("Could not reset the authentication session:", error);
+      event.currentTarget.disabled = false;
+      event.currentTarget.textContent = "Sign In Again";
+    }
+  });
 }
 
 function showConnectionBanner(message, error = false) {

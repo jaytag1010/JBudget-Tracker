@@ -3,10 +3,10 @@ export const CORE_DATA_SOURCES = ["categories", "paymentMethods", "budgets", "ex
 export function classifyFirebaseError(error, online = true) {
   const code = String(error?.code || "").toLowerCase();
   if (code.includes("permission-denied")) {
-    return { kind: "permission", title: "Data access denied", message: "We could not access your SpendWise data. Sign in again or check your account permissions.", retryable: false };
+    return { kind: "permission", title: "Data access denied", message: "We could not access your SpendWise data. Sign in again or check your account permissions.", retryable: false, reauthenticate: true };
   }
   if (code.includes("unauthenticated") || code.includes("user-token-expired")) {
-    return { kind: "auth", title: "Session expired", message: "Your session has expired. Please sign in again.", retryable: false };
+    return { kind: "auth", title: "Session expired", message: "Your session has expired. Please sign in again.", retryable: false, reauthenticate: true };
   }
   if (code.includes("invalid-api-key") || code.includes("app/no-options") || code.includes("invalid-argument")) {
     return { kind: "configuration", title: "Configuration error", message: "SpendWise could not start because its Firebase configuration is incomplete.", retryable: false };

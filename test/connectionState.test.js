@@ -24,6 +24,8 @@ test("offline cache is usable only when cached account data exists", () => {
 
 test("Firebase errors are classified without exposing raw details", () => {
   assert.equal(classifyFirebaseError({ code: "permission-denied" }).kind, "permission");
+  assert.equal(classifyFirebaseError({ code: "permission-denied" }).reauthenticate, true);
+  assert.equal(classifyFirebaseError({ code: "auth/user-token-expired" }).reauthenticate, true);
   assert.equal(classifyFirebaseError({ code: "unavailable" }).kind, "network");
   assert.equal(classifyFirebaseError({ code: "auth/user-token-expired" }).kind, "auth");
 });
