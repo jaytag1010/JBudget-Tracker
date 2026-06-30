@@ -1,5 +1,5 @@
 import {
-  clearFirestoreListeners, listenExpenses, setFirestoreConnectionObserver,
+  clearFirestoreListeners, listenExpenses, restartFirestoreListeners, setFirestoreConnectionObserver,
 } from "../firebase/db.js";
 import { reconnectFirebase } from "../firebase/config.js";
 import {
@@ -127,7 +127,9 @@ async function retryConnection() {
   if (!initialDataReady) showInitializing("Retrying Firebase connection...");
   else showConnectionBanner("Reconnecting to Firebase...");
   try {
+    coreSnapshots.clear();
     await reconnectFirebase();
+    restartFirestoreListeners();
     showConnectionBanner("Connected. Waiting for fresh data...");
   } catch (error) {
     handleFirestoreError({ source: "retry", error });

@@ -45,23 +45,39 @@ export function setFirestoreConnectionObserver(observer) {
 }
 
 export function clearFirestoreListeners() {
-  [...activeListeners].forEach(unsubscribe => unsubscribe());
+  [...activeListeners].forEach(listener => listener.stop());
   activeListeners.clear();
 }
 
+export function restartFirestoreListeners() {
+  [...activeListeners].forEach(listener => listener.start());
+}
+
 function trackedSnapshot(source, target, callback) {
-  let trackedUnsubscribe;
-  const unsubscribe = onSnapshot(target, { includeMetadataChanges: true }, snapshot => {
-    const size = typeof snapshot.size === "number" ? snapshot.size : snapshot.exists() ? 1 : 0;
-    connectionObserver?.onData?.({ source, fromCache: snapshot.metadata.fromCache, size });
-    callback(snapshot);
-  }, error => connectionObserver?.onError?.({ source, error }));
-  trackedUnsubscribe = () => {
-    activeListeners.delete(trackedUnsubscribe);
-    unsubscribe();
+  const listener = {
+    unsubscribe: null,
+    start() {
+      this.unsubscribe?.();
+      this.unsubscribe = onSnapshot(target, { includeMetadataChanges: true }, snapshot => {
+        const size = typeof snapshot.size === "number" ? snapshot.size : snapshot.exists() ? 1 : 0;
+        connectionObserver?.onData?.({ source, fromCache: snapshot.metadata.fromCache, size });
+        callback(snapshot);
+      }, error => {
+        this.unsubscribe = null;
+        connectionObserver?.onError?.({ source, error });
+      });
+    },
+    stop() {
+      this.unsubscribe?.();
+      this.unsubscribe = null;
+    },
   };
-  activeListeners.add(trackedUnsubscribe);
-  return trackedUnsubscribe;
+  listener.start();
+  activeListeners.add(listener);
+  return () => {
+    listener.stop();
+    activeListeners.delete(listener);
+  };
 }
 
 async function seedSnapshot(collectionName) {
