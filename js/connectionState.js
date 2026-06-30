@@ -1,9 +1,9 @@
-export const CORE_DATA_SOURCES = ["categories", "paymentMethods", "budgets", "expenses", "profileSettings"];
+export const CORE_DATA_SOURCES = ["budgets", "expenses", "profileSettings"];
 
 export function classifyFirebaseError(error, online = true) {
   const code = String(error?.code || "").toLowerCase();
   if (code.includes("permission-denied")) {
-    return { kind: "permission", title: "Data access denied", message: "We could not access your SpendWise data. Sign in again or check your account permissions.", retryable: false, reauthenticate: true };
+    return { kind: "permission", title: "Data access denied", message: "We could not access part of your SpendWise data. Check account permissions and retry.", retryable: true, reauthenticate: false };
   }
   if (code.includes("unauthenticated") || code.includes("user-token-expired")) {
     return { kind: "auth", title: "Session expired", message: "Your session has expired. Please sign in again.", retryable: false, reauthenticate: true };

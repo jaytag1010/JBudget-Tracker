@@ -120,9 +120,9 @@ function handleFirestoreData(snapshot) {
   }
 }
 
-function handleFirestoreError({ source, error }) {
+function handleFirestoreError({ source, path, error }) {
   clearTimeout(initialLoadTimer);
-  console.error(`Firestore listener failed (${source}):`, error);
+  console.error(`Firestore request failed [source=${source}; path=${path || "unknown"}; uid=${currentUser?.uid || "none"}]:`, error);
   const state = classifyFirebaseError(error, navigator.onLine);
   retrying = false;
   if (!CORE_DATA_SOURCES.includes(source) && source !== "retry") {

@@ -100,7 +100,7 @@ function scoreClass(score) {
 }
 
 function syncOverspendingNotifications() {
-  const { budget, expenses } = currentScope();
+  const { key, budget, expenses } = currentScope();
   const alerts = [];
   const total = Number(budget.total || 0);
   const spent = sumAmounts(expenses);

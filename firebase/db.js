@@ -64,7 +64,7 @@ function trackedSnapshot(source, target, callback) {
         callback(snapshot);
       }, error => {
         this.unsubscribe = null;
-        connectionObserver?.onError?.({ source, error });
+        connectionObserver?.onError?.({ source, path: target.path, error });
       });
     },
     stop() {
@@ -81,11 +81,14 @@ function trackedSnapshot(source, target, callback) {
 }
 
 async function seedSnapshot(collectionName) {
+  const path = `users/${uid()}/${collectionName}`;
   try {
     return await getDocs(userCol(collectionName));
   } catch (error) {
-    if (["unavailable", "deadline-exceeded", "network-request-failed"].some(code => String(error?.code || "").includes(code))) {
-      console.warn(`Skipped ${collectionName} defaults while Firebase is unavailable.`);
+    const code = String(error?.code || "");
+    connectionObserver?.onError?.({ source: `seed:${collectionName}`, path, error });
+    if (["unavailable", "deadline-exceeded", "network-request-failed", "permission-denied"].some(value => code.includes(value))) {
+      console.warn(`Skipped defaults for ${path} after Firestore returned ${code || "an error"}.`);
       return null;
     }
     throw error;
