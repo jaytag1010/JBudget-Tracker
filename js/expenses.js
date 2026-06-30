@@ -216,21 +216,24 @@ export async function handleDeleteExpense(id) {
 
 let _calcExpression = "";   // current expression string in the modal
 let _calcResult     = null; // evaluated result (number), or null if invalid
+let _calcReturnFocus = null;
 
 function openCalculatorModal() {
+  _calcReturnFocus = document.activeElement;
   const amountInput = document.getElementById("expense-amount");
   // Pre-populate with whatever is already in the amount field
   _calcExpression = (amountInput.value || "").trim().replace(/[₱,\s]/g, "");
   _calcResult     = null;
   renderCalcDisplay();
-  document.getElementById("calc-use-btn").disabled = true;
+  updateCalculatorViewport();
   openModal("modal-calc");
 }
 
 function renderCalcDisplay() {
   const displayEl = document.getElementById("calc-display");
   const resultEl  = document.getElementById("calc-result");
-  if (!displayEl || !resultEl) return;
+  const useBtn = document.getElementById("calc-use-btn");
+  if (!displayEl || !resultEl || !useBtn) return;
 
   displayEl.textContent = _calcExpression || "0";
 
@@ -240,16 +243,19 @@ function renderCalcDisplay() {
     // Replace internal * / with display symbols for readability
     resultEl.textContent = `= ${formatCurrency(val)}`;
     _calcResult = val;
-    document.getElementById("calc-use-btn").disabled = false;
+    useBtn.disabled = false;
+    useBtn.textContent = `Use ${formatCurrency(val)}`;
   } else if (val !== null) {
     // Expression IS a plain number — still allow "Use Amount"
     resultEl.textContent = "";
     _calcResult = val;
-    document.getElementById("calc-use-btn").disabled = false;
+    useBtn.disabled = false;
+    useBtn.textContent = `Use ${formatCurrency(val)}`;
   } else {
     resultEl.textContent = "";
     _calcResult = null;
-    document.getElementById("calc-use-btn").disabled = true;
+    useBtn.disabled = true;
+    useBtn.textContent = "Use Amount";
   }
 }
 
@@ -258,6 +264,8 @@ function initCalculatorModal() {
   const useBtn   = document.getElementById("calc-use-btn");
   const cancelBtn = document.getElementById("calc-cancel-btn");
   if (!grid) return;
+  window.visualViewport?.addEventListener("resize", updateCalculatorViewport);
+  window.addEventListener("orientationchange", updateCalculatorViewport);
 
   // Digit / operator button taps
   grid.querySelectorAll(".calc-key[data-value]").forEach(btn => {
@@ -308,11 +316,28 @@ function initCalculatorModal() {
     const amountInput = document.getElementById("expense-amount");
     amountInput.value = _calcResult;
     showToast(`= ${formatCurrency(_calcResult)}`);
-    closeModal("modal-calc");
+    closeCalculatorModal();
   });
 
   // "Cancel" — close without changing the amount field
-  cancelBtn?.addEventListener("click", () => closeModal("modal-calc"));
+  cancelBtn?.addEventListener("click", closeCalculatorModal);
+  grid.querySelector('[data-close="modal-calc"]')?.addEventListener("click", restoreCalculatorFocus);
+}
+
+function updateCalculatorViewport() {
+  const height = window.visualViewport?.height || window.innerHeight;
+  document.documentElement.style.setProperty("--calc-viewport-height", `${Math.max(320, Math.round(height))}px`);
+}
+
+function closeCalculatorModal() {
+  closeModal("modal-calc");
+  restoreCalculatorFocus();
+}
+
+function restoreCalculatorFocus() {
+  requestAnimationFrame(() => {
+    if (_calcReturnFocus?.isConnected) _calcReturnFocus.focus();
+  });
 }
 
 // ── Build a transaction card DOM element ──────

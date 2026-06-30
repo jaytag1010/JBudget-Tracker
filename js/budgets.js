@@ -2,7 +2,10 @@
 import {
   listenAllBudgets, setTotalBudget, setCategoryBudget, deleteCategoryBudget
 } from "../firebase/db.js";
-import { openModal, closeModal, showToast, confirmDialog, setProgressBar } from "./ui.js";
+import {
+  openModal, closeModal, showToast, confirmDialog, setProgressBar,
+  navigateTo, updateCurrentNavigationState,
+} from "./ui.js";
 import { formatCurrency, monthKey, monthLabel, expensesForMonth, groupByCategory, pct } from "./utils.js";
 import { getCategories } from "./settings.js";
 import { updateFinancialBudgets } from "./financial.js";
@@ -20,6 +23,10 @@ export function initBudgets(expenses) {
   renderBudgetMonth();
   subscribeToAllBudgets();
   bindBudgetEvents();
+  document.addEventListener("spendwise:navigation", event => {
+    if (event.detail?.page !== "budgets" || !event.detail.state?.budgetMode) return;
+    setBudgetMode(event.detail.state.budgetMode === "annual");
+  });
 }
 
 export function updateBudgetExpenses(expenses) {
@@ -148,6 +155,7 @@ function renderMonthlyCategoryBudgets(budget, monthExp, locked) {
 
     const card = document.createElement("div");
     card.className = "budget-cat-card";
+    makeBudgetCardInteractive(card, catName, false);
     card.innerHTML = `
       <div class="bcc-header">
         <div class="bcc-left">
@@ -177,8 +185,14 @@ function renderMonthlyCategoryBudgets(budget, monthExp, locked) {
       </div>` : ""}`;
 
     if (!locked) {
-      card.querySelector("[data-edit]").addEventListener("click", () => openEditCatBudget(catName, budgetAmt));
-      card.querySelector("[data-del]").addEventListener("click",  () => handleDeleteCatBudget(catName));
+      card.querySelector("[data-edit]").addEventListener("click", event => {
+        event.stopPropagation();
+        openEditCatBudget(catName, budgetAmt);
+      });
+      card.querySelector("[data-del]").addEventListener("click", event => {
+        event.stopPropagation();
+        handleDeleteCatBudget(catName);
+      });
     }
     el.appendChild(card);
   });
@@ -271,6 +285,7 @@ function renderAnnualCategoryBudgets(yearExp, catAnnual) {
 
     const card = document.createElement("div");
     card.className = "budget-cat-card";
+    makeBudgetCardInteractive(card, catName, true);
     card.innerHTML = `
       <div class="bcc-header">
         <div class="bcc-left">
@@ -296,6 +311,44 @@ function renderAnnualCategoryBudgets(yearExp, catAnnual) {
       </div>`;
     el.appendChild(card);
   });
+}
+
+function makeBudgetCardInteractive(card, category, annual) {
+  const [year, month] = currentMonthKey.split("-").map(Number);
+  const label = annual
+    ? `View ${category} expenses for ${new Date().getFullYear()}`
+    : `View ${category} expenses for ${monthLabel(currentMonthKey)}`;
+  card.tabIndex = 0;
+  card.setAttribute("role", "button");
+  card.setAttribute("aria-label", label);
+  const open = () => {
+    const mode = annual ? "annual" : "monthly";
+    updateCurrentNavigationState({ page: "budgets", budgetMode: mode });
+    navigateTo("history", {
+      filters: {
+        category,
+        year: annual ? new Date().getFullYear() : year,
+        month: annual ? "" : month,
+      },
+      state: { fromPage: "budgets", budgetMode: mode },
+    });
+  };
+  card.addEventListener("click", open);
+  card.addEventListener("keydown", event => {
+    if ((event.key === "Enter" || event.key === " ") && event.target === card) {
+      event.preventDefault();
+      open();
+    }
+  });
+}
+
+function setBudgetMode(annual) {
+  isAnnualMode = annual;
+  document.getElementById("budget-monthly-tab")?.classList.toggle("active", !annual);
+  document.getElementById("budget-annual-tab")?.classList.toggle("active", annual);
+  document.getElementById("budget-monthly-tab")?.setAttribute("aria-pressed", String(!annual));
+  document.getElementById("budget-annual-tab")?.setAttribute("aria-pressed", String(annual));
+  renderBudgetPage();
 }
 
 // ── Toggle UI visibility for annual/locked mode ─
@@ -456,22 +509,12 @@ function bindBudgetEvents() {
   // Monthly / Annual toggle
   document.getElementById("budget-monthly-tab")?.addEventListener("click", () => {
     if (!isAnnualMode) return;
-    isAnnualMode = false;
-    document.getElementById("budget-monthly-tab").classList.add("active");
-    document.getElementById("budget-annual-tab").classList.remove("active");
-    document.getElementById("budget-monthly-tab").setAttribute("aria-pressed", "true");
-    document.getElementById("budget-annual-tab").setAttribute("aria-pressed", "false");
-    renderBudgetPage();
+    setBudgetMode(false);
   });
 
   document.getElementById("budget-annual-tab")?.addEventListener("click", () => {
     if (isAnnualMode) return;
-    isAnnualMode = true;
-    document.getElementById("budget-annual-tab").classList.add("active");
-    document.getElementById("budget-monthly-tab").classList.remove("active");
-    document.getElementById("budget-annual-tab").setAttribute("aria-pressed", "true");
-    document.getElementById("budget-monthly-tab").setAttribute("aria-pressed", "false");
-    renderBudgetPage();
+    setBudgetMode(true);
   });
 
   // Calendar icon → Budget Timeline

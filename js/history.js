@@ -6,6 +6,7 @@ import { openModal } from "./ui.js";
 
 let _allExpenses = [];
 let _calendarDate = new Date();
+let _incomingFilters = null;
 
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
@@ -16,6 +17,12 @@ export function initHistory() {
   populateMonthNameFilter();
   bindHistoryFilters();
   bindCalendarEvents();
+  document.addEventListener("spendwise:navigation", event => {
+    if (event.detail?.page !== "history") return;
+    _incomingFilters = event.detail.filters || { category: "", year: "", month: "" };
+    applyIncomingFilters(true);
+    applyFilters();
+  });
   document.addEventListener("spendwise:category-insight", e => {
     if (e.detail?.category) openCategoryInsight(e.detail.category);
   });
@@ -25,7 +32,35 @@ export function updateHistory(expenses) {
   _allExpenses = expenses;
   populateYearFilter();
   populateCategoryFilter();
+  applyIncomingFilters(true);
   applyFilters();
+}
+
+function applyIncomingFilters(consume = false) {
+  if (!_incomingFilters) return;
+  ensureFilterOption("filter-year", _incomingFilters.year, _incomingFilters.year);
+  ensureFilterOption("filter-category", _incomingFilters.category, _incomingFilters.category);
+  setFilterValue("filter-category", _incomingFilters.category);
+  setFilterValue("filter-year", _incomingFilters.year);
+  setFilterValue("filter-month", _incomingFilters.month);
+  if (_incomingFilters.year && _incomingFilters.month) {
+    _calendarDate = new Date(Number(_incomingFilters.year), Number(_incomingFilters.month) - 1, 1);
+  }
+  if (consume) _incomingFilters = null;
+}
+
+function ensureFilterOption(id, value, label) {
+  if (!value) return;
+  const select = document.getElementById(id);
+  if (!select || [...select.options].some(option => option.value === String(value))) return;
+  select.add(new Option(String(label), String(value)));
+}
+
+function setFilterValue(id, value) {
+  const select = document.getElementById(id);
+  if (!select) return;
+  const normalized = String(value || "");
+  select.value = [...select.options].some(option => option.value === normalized) ? normalized : "";
 }
 
 // ── Year filter — derived from actual expense data ─
@@ -48,6 +83,8 @@ function populateYearFilter() {
     if (String(yr) === current) opt.selected = true;
     sel.appendChild(opt);
   });
+  ensureFilterOption("filter-year", current, current);
+  if (current) sel.value = current;
 }
 
 // ── Month name filter — static Jan–Dec ─────────
@@ -76,6 +113,8 @@ function populateCategoryFilter() {
     if (cat.name === current) opt.selected = true;
     sel.appendChild(opt);
   });
+  ensureFilterOption("filter-category", current, current);
+  if (current) sel.value = current;
 }
 
 // ── Get filtered expenses ─────────────────────
@@ -358,9 +397,12 @@ function renderAnalyticsChart(expenses) {
 // ── Bind filter controls ──────────────────────
 function bindHistoryFilters() {
   document.getElementById("search-input")   ?.addEventListener("input",  applyFilters);
-  document.getElementById("filter-category")?.addEventListener("change", applyFilters);
-  document.getElementById("filter-year")    ?.addEventListener("change", applyFilters);
-  document.getElementById("filter-month")   ?.addEventListener("change", applyFilters);
+  ["filter-category", "filter-year", "filter-month"].forEach(id => {
+    document.getElementById(id)?.addEventListener("change", () => {
+      _incomingFilters = null;
+      applyFilters();
+    });
+  });
   document.getElementById("search-clear")   ?.addEventListener("click", () => {
     const inp = document.getElementById("search-input");
     if (inp) { inp.value = ""; inp.dispatchEvent(new Event("input")); }

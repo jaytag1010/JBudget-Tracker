@@ -16,12 +16,12 @@ const googleProvider = new GoogleAuthProvider();
 
 // ── Auth state listener ───────────────────────
 // Calls onSignedIn(user) or onSignedOut() once Firebase resolves.
-export function initAuth(onSignedIn, onSignedOut) {
+export function initAuth(onSignedIn, onSignedOut, onError = console.error) {
   setPersistence(auth, browserLocalPersistence).catch(console.warn);
   return onAuthStateChanged(auth, user => {
     if (user) onSignedIn(user);
     else      onSignedOut();
-  });
+  }, onError);
 }
 
 // ── Sign-in methods ───────────────────────────

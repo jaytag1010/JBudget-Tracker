@@ -235,7 +235,7 @@ function bindSettingsPageEvents() {
     openModal("modal-theme");
   });
   document.getElementById("about-btn")?.addEventListener("click", () => {
-    showToast("SpendWise v2.2.1 recurring notification resolution fix", "info");
+    showToast("SpendWise v2.2.2 usability and connection fixes", "info");
   });
   document.getElementById("export-data-btn")?.addEventListener("click", handleExportData);
   document.getElementById("edit-profile-btn")?.addEventListener("click", openEditProfile);

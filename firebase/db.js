@@ -37,6 +37,45 @@ const userCol = (name)         => collection(db, "users", uid(), name);
 const userDoc = (name, id)     => doc(db,        "users", uid(), name, id);
 const userDocDirect = (name)   => doc(db,        "users", uid(), name);
 
+let connectionObserver = null;
+const activeListeners = new Set();
+
+export function setFirestoreConnectionObserver(observer) {
+  connectionObserver = observer;
+}
+
+export function clearFirestoreListeners() {
+  [...activeListeners].forEach(unsubscribe => unsubscribe());
+  activeListeners.clear();
+}
+
+function trackedSnapshot(source, target, callback) {
+  let trackedUnsubscribe;
+  const unsubscribe = onSnapshot(target, { includeMetadataChanges: true }, snapshot => {
+    const size = typeof snapshot.size === "number" ? snapshot.size : snapshot.exists() ? 1 : 0;
+    connectionObserver?.onData?.({ source, fromCache: snapshot.metadata.fromCache, size });
+    callback(snapshot);
+  }, error => connectionObserver?.onError?.({ source, error }));
+  trackedUnsubscribe = () => {
+    activeListeners.delete(trackedUnsubscribe);
+    unsubscribe();
+  };
+  activeListeners.add(trackedUnsubscribe);
+  return trackedUnsubscribe;
+}
+
+async function seedSnapshot(collectionName) {
+  try {
+    return await getDocs(userCol(collectionName));
+  } catch (error) {
+    if (["unavailable", "deadline-exceeded", "network-request-failed"].some(code => String(error?.code || "").includes(code))) {
+      console.warn(`Skipped ${collectionName} defaults while Firebase is unavailable.`);
+      return null;
+    }
+    throw error;
+  }
+}
+
 // ─────────────────────────────────────────────
 //  EXPENSES
 // ─────────────────────────────────────────────
@@ -64,7 +103,7 @@ export async function deleteExpense(id) {
 
 export function listenExpenses(callback) {
   const q = query(userCol(COL.expenses), orderBy("date", "desc"));
-  return onSnapshot(q, snap => {
+  return trackedSnapshot("expenses", q, snap => {
     const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     // Secondary sort: within the same transaction date, newest-entered first.
@@ -140,7 +179,7 @@ export async function deleteCategory(id) {
 }
 
 export function listenCategories(callback) {
-  return onSnapshot(userCol(COL.categories), snap => {
+  return trackedSnapshot("categories", userCol(COL.categories), snap => {
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     callback(items.sort((a, b) => (a.order ?? 99) - (b.order ?? 99)));
   });
@@ -148,7 +187,8 @@ export function listenCategories(callback) {
 
 // Seed default categories for a brand-new user
 export async function seedDefaultCategories() {
-  const snap = await getDocs(userCol(COL.categories));
+  const snap = await seedSnapshot(COL.categories);
+  if (!snap) return;
   if (!snap.empty) return;
   const defaults = [
     { name: "Food",            icon: "🍔", color: "#e74c3c", order: 0 },
@@ -178,7 +218,7 @@ export async function deletePaymentMethod(id) {
 }
 
 export function listenPaymentMethods(callback) {
-  return onSnapshot(userCol(COL.paymentMethods), snap => {
+  return trackedSnapshot("paymentMethods", userCol(COL.paymentMethods), snap => {
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     callback(items.sort((a, b) => (a.order ?? 99) - (b.order ?? 99)));
   });
@@ -186,7 +226,8 @@ export function listenPaymentMethods(callback) {
 
 // Seed default payment methods for a brand-new user
 export async function seedDefaultPaymentMethods() {
-  const snap = await getDocs(userCol(COL.paymentMethods));
+  const snap = await seedSnapshot(COL.paymentMethods);
+  if (!snap) return;
   if (!snap.empty) return;
   const defaults = [
     { name: "Cash",     icon: "💵", order: 0 },
@@ -230,13 +271,13 @@ export async function deleteCategoryBudget(monthKey, categoryName) {
 }
 
 export function listenBudget(monthKey, callback) {
-  return onSnapshot(userDoc(COL.budgets, monthKey), snap => {
+  return trackedSnapshot(`budget:${monthKey}`, userDoc(COL.budgets, monthKey), snap => {
     callback(snap.exists() ? { id: snap.id, ...snap.data() } : null);
   });
 }
 
 export function listenAllBudgets(callback) {
-  return onSnapshot(userCol(COL.budgets), snap => {
+  return trackedSnapshot("budgets", userCol(COL.budgets), snap => {
     const budgets = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     callback(budgets.sort((a, b) => a.id.localeCompare(b.id)));
   });
@@ -274,7 +315,7 @@ export async function deleteRecurringExpense(id) {
 
 export function listenRecurringExpenses(callback) {
   const q = query(userCol(COL.recurring), orderBy("createdAt", "asc"));
-  return onSnapshot(q, snap => {
+  return trackedSnapshot("recurringExpenses", q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
@@ -336,7 +377,7 @@ export async function payRecurringOccurrence(id, occurrence, expense) {
 }
 
 export function listenRecurringOccurrences(callback) {
-  return onSnapshot(userCol(COL.recurringOccurrences), snap => {
+  return trackedSnapshot("recurringOccurrences", userCol(COL.recurringOccurrences), snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
@@ -398,7 +439,7 @@ export async function deleteSavingsGoal(id) {
 
 export function listenSavingsGoals(callback) {
   const q = query(userCol(COL.savingsGoals), orderBy("createdAt", "asc"));
-  return onSnapshot(q, snap => {
+  return trackedSnapshot("savingsGoals", q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
@@ -416,7 +457,7 @@ export async function addSavingsContribution(data) {
 
 export function listenSavingsContributions(callback) {
   const q = query(userCol(COL.savingsHistory), orderBy("date", "asc"));
-  return onSnapshot(q, snap => {
+  return trackedSnapshot("savingsContributions", q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
@@ -475,7 +516,7 @@ export async function addSystemNotification(data) {
 
 export function listenNotifications(callback) {
   const q = query(userCol(COL.notifications), orderBy("updatedAt", "desc"));
-  return onSnapshot(q, snap => {
+  return trackedSnapshot("notifications", q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
@@ -524,7 +565,7 @@ export async function deleteRecurringNotificationsForOccurrences(occurrenceIds) 
 // ─────────────────────────────────────────────
 
 export function listenProfileSettings(callback) {
-  return onSnapshot(userDoc(COL.profileSettings, "profile"), snap => {
+  return trackedSnapshot("profileSettings", userDoc(COL.profileSettings, "profile"), snap => {
     callback(snap.exists() ? { id: snap.id, ...snap.data() } : null);
   });
 }
@@ -538,7 +579,8 @@ export async function updateProfileSettings(data) {
 
 // Seed default Emergency Fund goal for a brand-new user
 export async function seedDefaultSavingsGoal() {
-  const snap = await getDocs(userCol(COL.savingsGoals));
+  const snap = await seedSnapshot(COL.savingsGoals);
+  if (!snap) return;
   if (!snap.empty) return;
   await addDoc(userCol(COL.savingsGoals), {
     name: "Emergency Fund",

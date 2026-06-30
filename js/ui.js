@@ -50,9 +50,11 @@ export function initConfirmDialog() {
 }
 
 // ─── Navigation ──────────────────────────────
+import { buildNavigationUrl, parseNavigationLocation } from "./historyFilters.js";
+
 let currentPage = "dashboard";
 
-export function navigateTo(pageId) {
+export function navigateTo(pageId, options = {}) {
   const pages   = document.querySelectorAll(".page");
   const navBtns = document.querySelectorAll(".nav-item[data-page]");
   const target  = document.getElementById(`page-${pageId}`);
@@ -63,9 +65,35 @@ export function navigateTo(pageId) {
   target.classList.add("active");
   currentPage = pageId;
   target.scrollTop = 0;
+
+  if (options.recordHistory !== false) {
+    const url = buildNavigationUrl(location.pathname, pageId, options.filters || null);
+    const state = { page: pageId, ...(options.state || {}) };
+    history[options.replace ? "replaceState" : "pushState"](state, "", url);
+  }
+  document.dispatchEvent(new CustomEvent("spendwise:navigation", {
+    detail: { page: pageId, filters: options.filters || null, state: options.state || history.state || {} },
+  }));
 }
 
 export function getCurrentPage() { return currentPage; }
+
+export function updateCurrentNavigationState(patch) {
+  history.replaceState({ ...(history.state || {}), ...patch }, "", location.href);
+}
+
+export function initializeNavigation() {
+  const applyLocation = state => {
+    const route = parseNavigationLocation(location.search);
+    navigateTo(route.page, { recordHistory: false, filters: route.filters, state: state || {} });
+  };
+  if (!history.state?.page) {
+    const route = parseNavigationLocation(location.search);
+    history.replaceState({ page: route.page }, "", location.href);
+  }
+  window.addEventListener("popstate", event => applyLocation(event.state));
+  applyLocation(history.state);
+}
 
 // ─── Progress Bar Helpers ─────────────────────
 export function setProgressBar(barEl, pctEl, spent, total) {

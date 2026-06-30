@@ -4,7 +4,7 @@
 //  from https://console.firebase.google.com
 // ─────────────────────────────────────────────
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, enableIndexedDbPersistence }
+import { getFirestore, enableIndexedDbPersistence, disableNetwork, enableNetwork }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -24,10 +24,17 @@ export const auth = getAuth(app);
 export default app;
 
 // Enable offline persistence (cache data when offline)
-enableIndexedDbPersistence(db).catch(err => {
+export const persistenceReady = enableIndexedDbPersistence(db).then(() => true).catch(err => {
   if (err.code === 'failed-precondition') {
     console.warn("Offline persistence unavailable: multiple tabs open.");
   } else if (err.code === 'unimplemented') {
     console.warn("Offline persistence not supported in this browser.");
   }
+  return false;
 });
+
+export async function reconnectFirebase() {
+  await disableNetwork(db).catch(() => {});
+  await enableNetwork(db);
+  if (auth.currentUser) await auth.currentUser.reload();
+}

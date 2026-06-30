@@ -122,6 +122,52 @@ ul { list-style: none; }
   visibility: hidden;
   pointer-events: none;
 }
+.connection-banner {
+  position: fixed;
+  z-index: 450;
+  top: max(8px, env(safe-area-inset-top));
+  left: 50%;
+  width: min(calc(100% - 24px), 456px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--yellow);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 650;
+}
+.connection-banner.hidden { display: none; }
+.connection-banner.error { border-color: var(--red); }
+.connection-retry-btn {
+  min-width: 64px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: var(--radius-xs);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 750;
+}
+.loading-state-message {
+  max-width: 300px;
+  margin-top: 10px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+.loading-retry-btn {
+  min-height: 44px;
+  margin-top: 18px;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 750;
+}
 
 /* Ambient radial glow layer */
 .splash-bg-glow {
